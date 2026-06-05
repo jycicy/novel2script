@@ -15,7 +15,8 @@ AI 小说转剧本工具 — 将小说文本转换为结构化 YAML 剧本。
 ```bash
 cd backend
 pip install -r requirements.txt
-cp .env.example .env  # 填入 LLM API Key
+copy .env.example .env 
+#编辑.env文件,填入key,baseUrl和model
 uvicorn main:app --reload
 ```
 

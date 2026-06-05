@@ -1,0 +1,5 @@
+[project]
+name = "novel2scripts-backend"
+version = "0.1.0"
+description = "Novel to Screenplay conversion API"
+requires-python = ">=3.10"

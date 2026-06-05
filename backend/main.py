@@ -2,8 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from config import settings
+from routers.chapters import router as chapters_router
+from routers.export import router as export_router
 
 app = FastAPI(title="Novel2Scripts", version="0.1.0")
+app.include_router(chapters_router)
+app.include_router(export_router)
 
 app.add_middleware(
     CORSMiddleware,

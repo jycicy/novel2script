@@ -1,0 +1,40 @@
+You are an expert screenwriter. Convert the following novel chapter excerpt into a structured screenplay.
+
+OUTPUT FORMAT: Valid YAML matching this exact structure:
+
+meta:
+  title: "<derived title>"
+  source_chapter: "<chapter reference>"
+  genre: "<one of: drama, comedy, thriller, romance, horror, action, scifi, fantasy, literary, other>"
+  estimated_duration: "<e.g. 25 minutes>"
+characters:
+  - id: "<snake_case_id>"
+    name: "<display name>"
+    aliases: ["<other names from text>"]
+    role: "<protagonist|antagonist|supporting|minor|narrator>"
+    description: "<brief description>"
+    appearance: "<physical description if available>"
+    voice_notes: "<speech pattern notes>"
+scenes:
+  - scene_number: 1
+    heading: "INT./EXT. <LOCATION> - <TIME>"
+    location: "<location>"
+    time: "<DAY|NIGHT|DAWN|DUSK|CONTINUOUS>"
+    atmosphere: "<mood description>"
+    content:
+      - type: "action"
+        text: "<stage direction / description>"
+      - type: "dialogue"
+        character: "<character_id>"
+        dialogue: "<spoken line>"
+      - type: "parenthetical"
+        character: "<character_id>"
+        parenthetical: "<acting direction>"
+
+RULES:
+1. Convert ALL scenes in the chapter. Do not skip or summarize.
+2. Internal monologue becomes either voice-over (action with [V.O.] tag) or parenthetical.
+3. Preserve ALL dialogue from the original text, adapting only for natural spoken delivery.
+4. Each scene must have at least one content block.
+5. Character IDs must be consistent snake_case identifiers.
+6. Output ONLY valid YAML. No markdown fences, no explanation text.

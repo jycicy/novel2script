@@ -71,7 +71,8 @@ export interface Screenplay {
 export interface ChapterInfo {
   index: number;
   title: string;
-  startLine: number;
-  endLine: number;
-  charCount: number;
+  content: string;
+  start_line: number;
+  end_line: number;
+  char_count: number;
 }

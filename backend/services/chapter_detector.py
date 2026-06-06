@@ -6,6 +6,7 @@ from dataclasses import dataclass
 class ChapterInfo:
     index: int
     title: str
+    content: str
     start_line: int
     end_line: int
     char_count: int
@@ -46,6 +47,7 @@ def detect_chapters(text: str, min_chapter_length: int = 100) -> list[ChapterInf
             chunks.append(ChapterInfo(
                 index=idx,
                 title=f"片段 {idx + 1}",
+                content=chunk_text,
                 start_line=0,
                 end_line=0,
                 char_count=len(chunk_text),
@@ -64,6 +66,7 @@ def detect_chapters(text: str, min_chapter_length: int = 100) -> list[ChapterInf
         chapters.append(ChapterInfo(
             index=idx,
             title=title,
+            content=chapter_text,
             start_line=line_num,
             end_line=next_start - 1,
             char_count=len(chapter_text),

@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import NovelInput from "@/components/NovelInput";
 import ChapterSelector from "@/components/ChapterSelector";
 import { detectChapters } from "@/lib/api";
+import { saveProject } from "@/lib/storage";
 import type { ChapterInfo } from "@/types/screenplay";
 
 export default function Home() {
@@ -12,6 +13,7 @@ export default function Home() {
   const [chapters, setChapters] = useState<ChapterInfo[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const router = useRouter();
 
   const handleDetect = async (text: string) => {
     setNovelText(text);
@@ -28,6 +30,16 @@ export default function Home() {
   };
 
   const hasChapters = chapters.length > 0;
+
+  const handleStartConvert = () => {
+    saveProject({
+      novelText,
+      chapters: chapters.map((c) => ({ index: c.index, title: c.title, content: c.content, start_line: c.start_line, end_line: c.end_line, char_count: c.char_count })),
+      screenplays: {},
+      activeChapterIndex: 0,
+    });
+    router.push("/convert");
+  };
 
   return (
     <main className="min-h-screen flex flex-col">
@@ -59,12 +71,12 @@ export default function Home() {
             activeIndex={0}
             onSelect={() => {}}
           />
-          <Link
-            href="/convert"
-            className="mt-4 inline-block px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          <button
+            onClick={handleStartConvert}
+            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
           >
             开始转换
-          </Link>
+          </button>
         </section>
       )}
 

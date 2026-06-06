@@ -16,36 +16,27 @@ export default function ConversionProgress({
   if (!isConverting && !error) return null;
 
   return (
-    <div className="border rounded-lg p-6 text-center">
+    <div className="mb-4">
       {isConverting && (
-        <>
-          <div className="inline-block w-8 h-8 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
-          <p className="text-sm text-gray-600">正在转换，请稍候...</p>
-          <p className="text-xs text-gray-400 mt-1">这可能需要 10-30 秒</p>
-          {onCancel && (
-            <button
-              onClick={onCancel}
-              className="mt-3 text-xs text-gray-500 hover:text-gray-700 underline"
-            >
-              取消
-            </button>
-          )}
-        </>
+        <div className="flex items-center gap-3 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="w-4 h-4 border-2 border-blue-300 border-t-blue-600 rounded-full animate-spin flex-shrink-0" />
+          <p className="text-sm text-blue-700">正在转换中…可点击左侧章节切换查看</p>
+        </div>
       )}
 
       {error && (
-        <>
-          <div className="text-red-500 text-2xl mb-2">✕</div>
-          <p className="text-sm text-red-600 mb-3">{error}</p>
+        <div className="flex items-center gap-3 px-4 py-2 bg-red-50 border border-red-200 rounded-lg">
+          <span className="text-red-500">✕</span>
+          <p className="text-sm text-red-600 flex-1">{error}</p>
           {onRetry && (
             <button
               onClick={onRetry}
-              className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
             >
               重试
             </button>
           )}
-        </>
+        </div>
       )}
     </div>
   );

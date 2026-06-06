@@ -7,7 +7,6 @@ import ScriptPreview from "@/components/ScriptPreview";
 import ScriptEditor from "@/components/ScriptEditor";
 import CharacterPanel from "@/components/CharacterPanel";
 import ExportMenu from "@/components/ExportMenu";
-import ConversionProgress from "@/components/ConversionProgress";
 import SchemaViewer from "@/components/SchemaViewer";
 import { loadProject, saveProject } from "@/lib/storage";
 import { convertChapter, convertStream } from "@/lib/api";
@@ -54,6 +53,7 @@ export default function ConvertPage() {
     setStatusMap((prev) => ({ ...prev, [index]: "converting" }));
     setIsConverting(true);
     setError("");
+    setActiveIndex(index);
 
     try {
       // Get previous chapter's characters for consistency
@@ -91,6 +91,9 @@ export default function ConvertPage() {
     const newStatus: Record<number, "converting"> = {};
     pending.forEach((c) => (newStatus[c.index] = "converting"));
     setStatusMap((prev) => ({ ...prev, ...newStatus }));
+
+    // 自动跳到第一个待转换章节
+    setActiveIndex(pending[0].index);
 
     try {
       await convertStream(
@@ -174,7 +177,7 @@ export default function ConvertPage() {
             >
               Schema
             </button>
-            {!currentScreenplay && !isConverting && (
+            {!currentScreenplay && statusMap[activeIndex] !== "converting" && (
               <button
                 onClick={() => handleConvert(activeIndex)}
                 className="ml-auto px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
@@ -184,15 +187,22 @@ export default function ConvertPage() {
             )}
           </div>
 
-          {/* Progress */}
-          <ConversionProgress
-            isConverting={isConverting}
-            error={error}
-            onRetry={() => handleConvert(activeIndex)}
-          />
+          {/* Error */}
+          {error && (
+            <div className="flex items-center gap-3 px-4 py-2 mb-4 bg-red-50 border border-red-200 rounded-lg">
+              <span className="text-red-500">✕</span>
+              <p className="text-sm text-red-600 flex-1">{error}</p>
+              <button
+                onClick={() => handleConvert(activeIndex)}
+                className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+              >
+                重试
+              </button>
+            </div>
+          )}
 
           {/* Content */}
-          {currentScreenplay && !isConverting && (
+          {currentScreenplay && (
             <>
               {viewMode === "preview" ? (
                 <ScriptPreview screenplay={currentScreenplay} />
@@ -205,10 +215,20 @@ export default function ConvertPage() {
             </>
           )}
 
-          {!currentScreenplay && !isConverting && !error && (
+          {!currentScreenplay && !error && (
             <div className="text-center text-gray-400 py-20">
-              <p className="text-lg mb-2">暂无剧本内容</p>
-              <p className="text-sm">请先选择章节并点击"转换此章"</p>
+              {statusMap[activeIndex] === "converting" ? (
+                <>
+                  <div className="inline-block w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
+                  <p className="text-lg mb-1 text-gray-600">正在转换当前章节…</p>
+                  <p className="text-sm text-gray-400">转换完成后将自动显示</p>
+                </>
+              ) : (
+                <>
+                  <p className="text-lg mb-2">暂无剧本内容</p>
+                  <p className="text-sm">请先选择章节并点击"转换此章"</p>
+                </>
+              )}
             </div>
           )}
 

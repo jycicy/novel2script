@@ -97,7 +97,8 @@ async def _stream_convert(chapters):
         screenplay, errors = validate_screenplay_yaml(raw_yaml)
         if screenplay is None:
             fail += 1
-            yield json.dumps({"type": "error", "index": item.chapter_index, "title": item.title, "error": "YAML 校验失败"})
+            error_detail = "; ".join(e.message for e in errors[:3])
+            yield json.dumps({"type": "error", "index": item.chapter_index, "title": item.title, "error": f"Schema 校验失败: {error_detail}"})
             continue
 
         prev_characters = screenplay.characters

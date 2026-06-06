@@ -20,8 +20,8 @@ def build_conversion_prompt(
             for c in previous_characters
         )
         user_content = (
-            f"PREVIOUS CHARACTERS (use same IDs if they appear):\n{char_info}\n\n"
-            f"CHAPTER TEXT:\n{chapter_text}"
+            f"前一章已出场角色（如再次出场请使用相同的 id）:\n{char_info}\n\n"
+            f"章节正文:\n{chapter_text}"
         )
 
     return system_prompt, user_content

@@ -16,7 +16,7 @@ function getErrorMessage(status: number): string {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000); // 60s 超时
+  const timeout = setTimeout(() => controller.abort(), 120000); // 120s 超时
 
   let res: Response;
   try {
@@ -40,7 +40,12 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    const detail = error.detail?.message || error.detail;
+    const detail = error.detail;
+    if (typeof detail === "object" && detail !== null) {
+      const msg = detail.message || getErrorMessage(res.status);
+      const errs = detail.errors?.map((e: { message: string }) => e.message).join("; ");
+      throw new Error(errs ? `${msg}: ${errs}` : msg);
+    }
     throw new Error(detail || getErrorMessage(res.status));
   }
 

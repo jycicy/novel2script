@@ -1,6 +1,14 @@
+import logging
+import asyncio
+
 from openai import AsyncOpenAI
 
 from config import settings
+
+logger = logging.getLogger(__name__)
+
+MAX_RETRIES = 3
+BASE_DELAY = 1.0
 
 
 class LLMService:
@@ -30,24 +38,36 @@ class LLMService:
                 f"CHAPTER TEXT:\n{chapter_text}"
             )
 
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_content},
-            ],
-            max_tokens=self.max_tokens,
-            temperature=self.temperature,
-        )
+        last_error = None
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_content},
+                    ],
+                    max_tokens=self.max_tokens,
+                    temperature=self.temperature,
+                )
 
-        raw = response.choices[0].message.content
+                raw = response.choices[0].message.content
 
-        if raw.startswith("```"):
-            raw = raw.split("\n", 1)[1]
-            if raw.endswith("```"):
-                raw = raw[:-3]
+                if raw.startswith("```"):
+                    raw = raw.split("\n", 1)[1]
+                    if raw.endswith("```"):
+                        raw = raw[:-3]
 
-        return raw.strip()
+                return raw.strip()
+
+            except Exception as e:
+                last_error = e
+                delay = BASE_DELAY * (2 ** attempt)
+                logger.warning(f"LLM 调用失败 (尝试 {attempt + 1}/{MAX_RETRIES}): {e}, {delay}s 后重试")
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(delay)
+
+        raise last_error
 
 
 llm_service = LLMService()

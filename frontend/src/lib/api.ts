@@ -2,15 +2,46 @@ import type { ChapterInfo, Screenplay } from "@/types/screenplay";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "";
 
+function getErrorMessage(status: number): string {
+  const map: Record<number, string> = {
+    400: "请求参数错误",
+    404: "接口不存在，请检查后端服务",
+    422: "LLM 输出格式不符合预期，请重试",
+    500: "服务器内部错误",
+    502: "LLM 服务暂时不可用，请稍后重试",
+    503: "服务暂不可用，请稍后重试",
+  };
+  return map[status] || `请求失败 (${status})`;
+}
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...options,
-  });
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 60000); // 60s 超时
+
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      ...options,
+    });
+  } catch (e) {
+    clearTimeout(timeout);
+    if (e instanceof DOMException && e.name === "AbortError") {
+      throw new Error("请求超时，LLM 转换可能需要较长时间，请重试");
+    }
+    if (e instanceof TypeError && e.message.includes("fetch")) {
+      throw new Error("网络连接失败，请检查网络或后端服务是否启动");
+    }
+    throw new Error(`网络错误: ${e instanceof Error ? e.message : "未知错误"}`);
+  }
+
+  clearTimeout(timeout);
 
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: res.statusText }));
-    throw new Error(error.detail?.message || error.detail || `请求失败: ${res.status}`);
+    const detail = error.detail?.message || error.detail;
+    throw new Error(detail || getErrorMessage(res.status));
   }
 
   return res.json();

@@ -1,0 +1,95 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: Screenplay
+description: Structured screenplay converted from novel text
+type: object
+required:
+  - meta
+  - characters
+  - scenes
+properties:
+  meta:
+    type: object
+    required: [title, source_chapter, genre, estimated_duration]
+    properties:
+      title:
+        type: string
+        description: "Screenplay title"
+      source_chapter:
+        type: string
+        description: "Original chapter reference"
+      genre:
+        type: string
+        enum: [drama, comedy, thriller, romance, horror, action, scifi, fantasy, literary, other]
+      estimated_duration:
+        type: string
+        description: "Estimated runtime"
+      author:
+        type: string
+      version:
+        type: string
+        default: "1.0"
+      created_at:
+        type: string
+        format: date-time
+
+  characters:
+    type: array
+    items:
+      type: object
+      required: [id, name, role]
+      properties:
+        id:
+          type: string
+          pattern: "^[a-z_][a-z0-9_]*$"
+        name:
+          type: string
+        aliases:
+          type: array
+          items:
+            type: string
+        role:
+          type: string
+          enum: [protagonist, antagonist, supporting, minor, narrator]
+        description:
+          type: string
+        appearance:
+          type: string
+        voice_notes:
+          type: string
+
+  scenes:
+    type: array
+    items:
+      type: object
+      required: [scene_number, heading, location, time, content]
+      properties:
+        scene_number:
+          type: integer
+          minimum: 1
+        heading:
+          type: string
+        location:
+          type: string
+        time:
+          type: string
+        atmosphere:
+          type: string
+        content:
+          type: array
+          items:
+            type: object
+            required: [type]
+            properties:
+              type:
+                type: string
+                enum: [action, dialogue, parenthetical, transition, scene_heading]
+              text:
+                type: string
+              character:
+                type: string
+              dialogue:
+                type: string
+              parenthetical:
+                type: string
+              transition:
+                type: string

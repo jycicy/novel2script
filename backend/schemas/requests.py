@@ -7,6 +7,7 @@ from .screenplay import Character, Screenplay
 class ChapterInfo(BaseModel):
     index: int
     title: str
+    content: str
     start_line: int
     end_line: int
     char_count: int

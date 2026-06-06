@@ -5,7 +5,7 @@ const STORAGE_KEY = "novel2scripts_project";
 
 export interface ProjectState {
   novelText: string;
-  chapters: { index: number; title: string }[];
+  chapters: { index: number; title: string; content: string; start_line: number; end_line: number; char_count: number }[];
   screenplays: Record<number, Screenplay>;
   activeChapterIndex: number;
 }

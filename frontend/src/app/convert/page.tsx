@@ -36,7 +36,7 @@ export default function ConvertPage() {
     if (chapters.length > 0) {
       saveProject({
         novelText: "",
-        chapters: chapters.map((c) => ({ index: c.index, title: c.title })),
+        chapters: chapters.map((c) => ({ index: c.index, title: c.title, content: c.content, start_line: c.start_line, end_line: c.end_line, char_count: c.char_count })),
         screenplays,
         activeChapterIndex: activeIndex,
       });
@@ -58,7 +58,7 @@ export default function ConvertPage() {
       const prevChars = index > 0 ? screenplays[index - 1]?.characters : undefined;
 
       const result = await convertChapter({
-        chapter_text: "", // TODO: load from storage
+        chapter_text: chapter.content,
         chapter_index: index,
         title: chapter.title,
         previous_characters: prevChars?.map((c) => ({

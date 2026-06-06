@@ -13,6 +13,7 @@ async def detect_chapters_endpoint(req: ChapterDetectRequest):
         ChapterInfo(
             index=c.index,
             title=c.title,
+            content=c.content,
             start_line=c.start_line,
             end_line=c.end_line,
             char_count=c.char_count,

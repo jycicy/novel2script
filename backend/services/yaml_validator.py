@@ -1,3 +1,4 @@
+import re
 import yaml
 from pydantic import ValidationError as PydanticValidationError
 
@@ -5,16 +6,46 @@ from schemas.screenplay import Screenplay
 from schemas.requests import ValidationError
 
 
+def repair_common_yaml_errors(raw: str) -> str:
+    text = raw.strip()
+
+    # 1. 去掉 markdown 代码块包裹
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        if text.endswith("```"):
+            text = text[:-3]
+        text = text.strip()
+
+    # 2. 修复冒号后缺少空格 (key:value → key: value)
+    text = re.sub(r"(\w):(\S)", r"\1: \2", text)
+
+    # 3. 去掉行尾多余空格
+    lines = text.split("\n")
+    lines = [line.rstrip() for line in lines]
+
+    # 4. 修复常见缩进问题（tab → 2 空格）
+    lines = [line.replace("\t", "  ") for line in lines]
+
+    return "\n".join(lines)
+
+
 def validate_screenplay_yaml(raw_yaml: str) -> tuple[Screenplay | None, list[ValidationError]]:
     errors: list[ValidationError] = []
 
+    # 先尝试自动修复
+    repaired = repair_common_yaml_errors(raw_yaml)
+
     try:
-        data = yaml.safe_load(raw_yaml)
-    except yaml.YAMLError as e:
-        line = getattr(e, "problem_mark", None)
-        line_num = line.line + 1 if line else None
-        errors.append(ValidationError(line=line_num, message=f"YAML 解析错误: {e}"))
-        return None, errors
+        data = yaml.safe_load(repaired)
+    except yaml.YAMLError:
+        # 修复后仍失败，用原始内容再试一次并报错
+        try:
+            data = yaml.safe_load(raw_yaml)
+        except yaml.YAMLError as e:
+            line = getattr(e, "problem_mark", None)
+            line_num = line.line + 1 if line else None
+            errors.append(ValidationError(line=line_num, message=f"YAML 解析错误: {e}"))
+            return None, errors
 
     if not isinstance(data, dict):
         errors.append(ValidationError(message="YAML 根元素必须是对象"))
@@ -29,18 +60,3 @@ def validate_screenplay_yaml(raw_yaml: str) -> tuple[Screenplay | None, list[Val
         return None, errors
 
     return screenplay, []
-
-
-def repair_common_yaml_errors(raw: str) -> str:
-    lines = raw.split("\n")
-    repaired: list[str] = []
-
-    for line in lines:
-        stripped = line.rstrip()
-        if stripped and not stripped.endswith(":") and ":" in stripped:
-            key_part, _, value_part = stripped.partition(":")
-            if value_part and not value_part.startswith(" "):
-                stripped = f"{key_part}: {value_part}"
-        repaired.append(stripped)
-
-    return "\n".join(repaired)

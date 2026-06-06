@@ -39,6 +39,22 @@ class ConvertResponse(BaseModel):
     usage: UsageInfo
 
 
+class BatchChapterItem(BaseModel):
+    chapter_text: str
+    chapter_index: int
+    title: str
+
+
+class BatchConvertRequest(BaseModel):
+    chapters: list[BatchChapterItem]
+
+
+class BatchConvertResponse(BaseModel):
+    screenplays: list[Screenplay]
+    success_count: int
+    fail_count: int
+
+
 class ValidateRequest(BaseModel):
     yaml_text: str
 

@@ -9,7 +9,7 @@ import CharacterPanel from "@/components/CharacterPanel";
 import ExportMenu from "@/components/ExportMenu";
 import ConversionProgress from "@/components/ConversionProgress";
 import { loadProject, saveProject } from "@/lib/storage";
-import { convertChapter } from "@/lib/api";
+import { convertChapter, convertStream } from "@/lib/api";
 import type { ChapterInfo, Screenplay } from "@/types/screenplay";
 
 export default function ConvertPage() {
@@ -79,10 +79,37 @@ export default function ConvertPage() {
   };
 
   const handleConvertAll = async () => {
-    for (let i = 0; i < chapters.length; i++) {
-      if (statusMap[chapters[i].index] !== "done") {
-        await handleConvert(chapters[i].index);
-      }
+    const pending = chapters.filter((c) => statusMap[c.index] !== "done");
+    if (pending.length === 0) return;
+
+    setIsConverting(true);
+    setError("");
+
+    // 标记所有待转换章节为 converting
+    const newStatus: Record<number, "converting"> = {};
+    pending.forEach((c) => (newStatus[c.index] = "converting"));
+    setStatusMap((prev) => ({ ...prev, ...newStatus }));
+
+    try {
+      await convertStream(
+        pending.map((c) => ({
+          chapter_text: c.content,
+          chapter_index: c.index,
+          title: c.title,
+        })),
+        (event) => {
+          if (event.type === "chapter_done" && event.index !== undefined && event.screenplay) {
+            setScreenplays((prev) => ({ ...prev, [event.index!]: event.screenplay! }));
+            setStatusMap((prev) => ({ ...prev, [event.index!]: "done" }));
+          } else if (event.type === "error" && event.index !== undefined) {
+            setStatusMap((prev) => ({ ...prev, [event.index!]: "error" }));
+          }
+        },
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "批量转换失败");
+    } finally {
+      setIsConverting(false);
     }
   };
 

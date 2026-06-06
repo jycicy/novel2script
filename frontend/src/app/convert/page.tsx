@@ -1,28 +1,89 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
+import ChapterSelector from "@/components/ChapterSelector";
+import ScriptPreview from "@/components/ScriptPreview";
+import ScriptEditor from "@/components/ScriptEditor";
+import CharacterPanel from "@/components/CharacterPanel";
+import ExportMenu from "@/components/ExportMenu";
+import ConversionProgress from "@/components/ConversionProgress";
+import { loadProject, saveProject } from "@/lib/storage";
+import { convertChapter } from "@/lib/api";
+import type { ChapterInfo, Screenplay } from "@/types/screenplay";
 
 export default function ConvertPage() {
-  const [novelText, setNovelText] = useState("");
-  const [charCount, setCharCount] = useState(0);
+  const [chapters, setChapters] = useState<ChapterInfo[]>([]);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [screenplays, setScreenplays] = useState<Record<number, Screenplay>>({});
+  const [viewMode, setViewMode] = useState<"preview" | "editor">("preview");
+  const [isConverting, setIsConverting] = useState(false);
+  const [error, setError] = useState("");
+  const [statusMap, setStatusMap] = useState<Record<number, "pending" | "converting" | "done" | "error">>({});
 
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const text = e.target.value;
-    setNovelText(text);
-    setCharCount(text.length);
+  // Load from localStorage on mount
+  useEffect(() => {
+    const project = loadProject();
+    if (project) {
+      setChapters(project.chapters as ChapterInfo[]);
+      setScreenplays(project.screenplays);
+      setActiveIndex(project.activeChapterIndex);
+    }
+  }, []);
+
+  // Save to localStorage on change
+  useEffect(() => {
+    if (chapters.length > 0) {
+      saveProject({
+        novelText: "",
+        chapters: chapters.map((c) => ({ index: c.index, title: c.title })),
+        screenplays,
+        activeChapterIndex: activeIndex,
+      });
+    }
+  }, [chapters, screenplays, activeIndex]);
+
+  const currentScreenplay = screenplays[activeIndex];
+
+  const handleConvert = async (index: number) => {
+    const chapter = chapters[index];
+    if (!chapter) return;
+
+    setStatusMap((prev) => ({ ...prev, [index]: "converting" }));
+    setIsConverting(true);
+    setError("");
+
+    try {
+      // Get previous chapter's characters for consistency
+      const prevChars = index > 0 ? screenplays[index - 1]?.characters : undefined;
+
+      const result = await convertChapter({
+        chapter_text: "", // TODO: load from storage
+        chapter_index: index,
+        title: chapter.title,
+        previous_characters: prevChars?.map((c) => ({
+          id: c.id,
+          name: c.name,
+          role: c.role,
+        })),
+      });
+
+      setScreenplays((prev) => ({ ...prev, [index]: result }));
+      setStatusMap((prev) => ({ ...prev, [index]: "done" }));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "转换失败");
+      setStatusMap((prev) => ({ ...prev, [index]: "error" }));
+    } finally {
+      setIsConverting(false);
+    }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const text = event.target?.result as string;
-      setNovelText(text);
-      setCharCount(text.length);
-    };
-    reader.readAsText(file);
+  const handleConvertAll = async () => {
+    for (let i = 0; i < chapters.length; i++) {
+      if (statusMap[chapters[i].index] !== "done") {
+        await handleConvert(chapters[i].index);
+      }
+    }
   };
 
   return (
@@ -32,49 +93,91 @@ export default function ConvertPage() {
         <Link href="/" className="text-xl font-bold">
           Novel2Scripts
         </Link>
-        <span className="text-sm text-gray-500">剧本编辑器</span>
+        <div className="flex items-center gap-3">
+          {currentScreenplay && <ExportMenu screenplay={currentScreenplay} />}
+        </div>
       </header>
 
-      {/* Content */}
-      <div className="flex-1 flex flex-col p-6 max-w-4xl mx-auto w-full">
-        <h2 className="text-xl font-semibold mb-4">输入小说文本</h2>
+      {/* Main Content */}
+      <div className="flex-1 flex">
+        {/* Left: Chapter Selector */}
+        <aside className="w-64 border-r p-4 overflow-y-auto">
+          <ChapterSelector
+            chapters={chapters}
+            activeIndex={activeIndex}
+            onSelect={setActiveIndex}
+            onConvertAll={handleConvertAll}
+            statusMap={statusMap}
+          />
+        </aside>
 
-        {/* File upload */}
-        <div className="mb-4">
-          <label className="inline-block px-4 py-2 border rounded-lg cursor-pointer hover:bg-gray-50 transition text-sm">
-            上传文件 (.txt)
-            <input
-              type="file"
-              accept=".txt"
-              onChange={handleFileUpload}
-              className="hidden"
-            />
-          </label>
-          <span className="ml-3 text-sm text-gray-500">
-            或直接粘贴文本到下方
-          </span>
+        {/* Center: Preview / Editor */}
+        <div className="flex-1 p-6 overflow-y-auto">
+          {/* View Toggle */}
+          <div className="flex gap-2 mb-4">
+            <button
+              onClick={() => setViewMode("preview")}
+              className={`px-3 py-1.5 text-sm rounded ${
+                viewMode === "preview"
+                  ? "bg-blue-600 text-white"
+                  : "border hover:bg-gray-50"
+              }`}
+            >
+              预览
+            </button>
+            <button
+              onClick={() => setViewMode("editor")}
+              className={`px-3 py-1.5 text-sm rounded ${
+                viewMode === "editor"
+                  ? "bg-blue-600 text-white"
+                  : "border hover:bg-gray-50"
+              }`}
+            >
+              编辑
+            </button>
+            {!currentScreenplay && !isConverting && (
+              <button
+                onClick={() => handleConvert(activeIndex)}
+                className="ml-auto px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+              >
+                转换此章
+              </button>
+            )}
+          </div>
+
+          {/* Progress */}
+          <ConversionProgress
+            isConverting={isConverting}
+            error={error}
+            onRetry={() => handleConvert(activeIndex)}
+          />
+
+          {/* Content */}
+          {currentScreenplay && !isConverting && (
+            <>
+              {viewMode === "preview" ? (
+                <ScriptPreview screenplay={currentScreenplay} />
+              ) : (
+                <ScriptEditor
+                  screenplay={currentScreenplay}
+                  onChange={(text) => console.log("edited", text.length)}
+                />
+              )}
+            </>
+          )}
+
+          {!currentScreenplay && !isConverting && !error && (
+            <div className="text-center text-gray-400 py-20">
+              <p className="text-lg mb-2">暂无剧本内容</p>
+              <p className="text-sm">请先选择章节并点击"转换此章"</p>
+            </div>
+          )}
         </div>
 
-        {/* Textarea */}
-        <textarea
-          className="flex-1 min-h-[400px] w-full border rounded-lg p-4 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-blue-500"
-          placeholder="在此粘贴小说文本...&#10;&#10;支持的章节格式：&#10;第一章 xxx&#10;Chapter 1 xxx&#10;1. xxx"
-          value={novelText}
-          onChange={handleChange}
-        />
-
-        {/* Footer bar */}
-        <div className="mt-4 flex items-center justify-between">
-          <span className="text-sm text-gray-500">
-            {charCount > 0 ? `共 ${charCount} 字` : "等待输入..."}
-          </span>
-          <button
-            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={charCount === 0}
-          >
-            检测章节
-          </button>
-        </div>
+        {/* Right: Character Panel */}
+        <aside className="w-72 border-l p-4 overflow-y-auto">
+          <CharacterPanel characters={currentScreenplay?.characters || []} />
+        </aside>
       </div>
     </main>
   );

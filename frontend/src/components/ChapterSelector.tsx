@@ -21,15 +21,15 @@ export default function ChapterSelector({
 }: ChapterSelectorProps) {
   const statusIcon: Record<ChapterStatus, string> = {
     pending: "○",
-    converting: "◌",
-    done: "●",
-    error: "✕",
+    converting: "⏳",
+    done: "✅",
+    error: "❌",
   };
 
   const statusColor: Record<ChapterStatus, string> = {
     pending: "text-gray-400",
     converting: "text-blue-500 animate-pulse",
-    done: "text-green-500",
+    done: "text-green-600",
     error: "text-red-500",
   };
 

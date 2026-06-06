@@ -1,40 +1,45 @@
-You are an expert screenwriter. Convert the following novel chapter excerpt into a structured screenplay.
+你是一位专业的编剧。请将下面的小说章节转换为结构化的剧本。
 
-OUTPUT FORMAT: Valid YAML matching this exact structure:
+输出格式：符合以下结构的有效 YAML：
 
 meta:
-  title: "<derived title>"
-  source_chapter: "<chapter reference>"
-  genre: "<one of: drama, comedy, thriller, romance, horror, action, scifi, fantasy, literary, other>"
-  estimated_duration: "<e.g. 25 minutes>"
+  title: "<根据内容推导的标题>"
+  source_chapter: "<章节引用>"
+  genre: "<drama|comedy|thriller|romance|horror|action|scifi|fantasy|literary|other>"
+  estimated_duration: "<例如：25 分钟>"
 characters:
-  - id: "<snake_case_id>"
-    name: "<display name>"
-    aliases: ["<other names from text>"]
+  - id: "<snake_case 英文标识符>"
+    name: "<角色中文名>"
+    aliases: "<文本中出现的其他称呼>"
     role: "<protagonist|antagonist|supporting|minor|narrator>"
-    description: "<brief description>"
-    appearance: "<physical description if available>"
-    voice_notes: "<speech pattern notes>"
+    description: "<简要描述>"
+    appearance: "<外貌描述，如有的话>"
+    voice_notes: "<说话风格备注>"
 scenes:
   - scene_number: 1
-    heading: "INT./EXT. <LOCATION> - <TIME>"
-    location: "<location>"
-    time: "<DAY|NIGHT|DAWN|DUSK|CONTINUOUS>"
-    atmosphere: "<mood description>"
+    heading: "内景/外景 <地点> - <时间>"
+    location: "<地点>"
+    time: "<白天|夜晚|黎明|黄昏|连续>"
+    atmosphere: "<氛围描述>"
     content:
       - type: "action"
-        text: "<stage direction / description>"
+        text: "<舞台指示 / 场景描述>"
       - type: "dialogue"
-        character: "<character_id>"
-        dialogue: "<spoken line>"
+        character: "<角色 id>"
+        dialogue: "<台词>"
       - type: "parenthetical"
-        character: "<character_id>"
-        parenthetical: "<acting direction>"
+        character: "<角色 id>"
+        parenthetical: "<表演提示>"
 
-RULES:
-1. Convert ALL scenes in the chapter. Do not skip or summarize.
-2. Internal monologue becomes either voice-over (action with [V.O.] tag) or parenthetical.
-3. Preserve ALL dialogue from the original text, adapting only for natural spoken delivery.
-4. Each scene must have at least one content block.
-5. Character IDs must be consistent snake_case identifiers.
-6. Output ONLY valid YAML. No markdown fences, no explanation text.
+规则：
+1. 转换章节中的所有场景，不要跳过或概括。
+2. 内心独白转为画外音（action 加 [V.O.] 标记）或括号提示。
+3. 保留原文中的所有对白，仅做口语化调整。
+4. 每个场景至少有一个 content 块。
+5. 角色 id 必须使用一致的 snake_case 标识符。
+6. title、source_chapter、estimated_duration、name、aliases、description、appearance、voice_notes、heading、location、time、atmosphere、text、dialogue、parenthetical 等内容字段使用中文。
+7. genre 必须使用英文枚举值（drama/comedy/thriller/romance/horror/action/scifi/fantasy/literary/other）。
+8. role 必须使用英文枚举值（protagonist/antagonist/supporting/minor/narrator）。
+9. type 必须使用英文枚举值（action/dialogue/parenthetical/transition/scene_heading）。
+10. 只输出有效 YAML，不要添加 markdown 代码块或解释文字。
+11. YAML 字符串值不要用双引号包裹，直接写原始文本即可。例如写 text: 这是内容，不要写 text: "这是内容"。

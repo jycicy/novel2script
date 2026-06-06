@@ -14,6 +14,14 @@ const ROLE_COLORS: Record<string, string> = {
   narrator: "bg-purple-50 text-purple-700 border-purple-200",
 };
 
+const ROLE_LABELS: Record<string, string> = {
+  protagonist: "主角",
+  antagonist: "反派",
+  supporting: "配角",
+  minor: "龙套",
+  narrator: "旁白",
+};
+
 export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
   const getCharacterName = (id: string): string => {
     const char = screenplay.characters.find((c) => c.id === id);
@@ -32,7 +40,7 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
       case "dialogue":
         return (
           <div key={idx} className="my-3">
-            <div className="text-center font-bold text-sm tracking-widest uppercase text-gray-900">
+            <div className="text-center font-bold text-sm text-gray-900">
               {getCharacterName(block.character || "")}
             </div>
             <div className="mx-auto max-w-sm text-center text-sm leading-relaxed text-gray-700 mt-1 px-4">
@@ -101,7 +109,7 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
                 className={`text-xs px-2.5 py-1 rounded-full border ${ROLE_COLORS[c.role] || ROLE_COLORS.minor}`}
               >
                 {c.name}
-                <span className="opacity-60 ml-1">· {c.role}</span>
+                <span className="opacity-60 ml-1">· {ROLE_LABELS[c.role] || c.role}</span>
               </span>
             ))}
           </div>
@@ -114,7 +122,7 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
           <div key={scene.scene_number} className="mb-10">
             <div className="flex items-center gap-3 mb-2">
               <span className="inline-block px-2 py-0.5 text-xs font-bold bg-gray-800 text-white rounded">
-                SCENE {scene.scene_number}
+                场景 {scene.scene_number}
               </span>
               <span className="font-bold text-sm text-gray-900">
                 {scene.heading}

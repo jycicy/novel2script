@@ -26,7 +26,18 @@ def repair_common_yaml_errors(raw: str) -> str:
     # 4. 修复常见缩进问题（tab → 2 空格）
     lines = [line.replace("\t", "  ") for line in lines]
 
-    return "\n".join(lines)
+    # 5. 修复未闭合的双引号（key: "value 没有闭合引号）
+    fixed_lines = []
+    for line in lines:
+        m = re.match(r'^(\s*[\w_]+:\s*)"(.+)$', line)
+        if m and not line.rstrip().endswith('"'):
+            indent, content = m.group(1), m.group(2)
+            # 去掉内容中可能混入的多余引号，统一补一个闭合引号
+            content = content.rstrip('"').rstrip()
+            line = f'{indent}"{content}"'
+        fixed_lines.append(line)
+
+    return "\n".join(fixed_lines)
 
 
 def validate_screenplay_yaml(raw_yaml: str) -> tuple[Screenplay | None, list[ValidationError]]:

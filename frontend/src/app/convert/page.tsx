@@ -8,6 +8,7 @@ import ScriptEditor from "@/components/ScriptEditor";
 import CharacterPanel from "@/components/CharacterPanel";
 import ExportMenu from "@/components/ExportMenu";
 import ConversionProgress from "@/components/ConversionProgress";
+import SchemaViewer from "@/components/SchemaViewer";
 import { loadProject, saveProject } from "@/lib/storage";
 import { convertChapter, convertStream } from "@/lib/api";
 import type { ChapterInfo, Screenplay } from "@/types/screenplay";
@@ -17,6 +18,7 @@ export default function ConvertPage() {
   const [activeIndex, setActiveIndex] = useState(0);
   const [screenplays, setScreenplays] = useState<Record<number, Screenplay>>({});
   const [viewMode, setViewMode] = useState<"preview" | "editor">("preview");
+  const [showSchema, setShowSchema] = useState(false);
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState("");
   const [statusMap, setStatusMap] = useState<Record<number, "pending" | "converting" | "done" | "error">>({});
@@ -162,6 +164,16 @@ export default function ConvertPage() {
             >
               编辑
             </button>
+            <button
+              onClick={() => setShowSchema(!showSchema)}
+              className={`px-3 py-1.5 text-sm rounded ${
+                showSchema
+                  ? "bg-purple-600 text-white"
+                  : "border hover:bg-gray-50"
+              }`}
+            >
+              Schema
+            </button>
             {!currentScreenplay && !isConverting && (
               <button
                 onClick={() => handleConvert(activeIndex)}
@@ -197,6 +209,13 @@ export default function ConvertPage() {
             <div className="text-center text-gray-400 py-20">
               <p className="text-lg mb-2">暂无剧本内容</p>
               <p className="text-sm">请先选择章节并点击"转换此章"</p>
+            </div>
+          )}
+
+          {/* Schema Viewer */}
+          {showSchema && (
+            <div className="mt-4">
+              <SchemaViewer onClose={() => setShowSchema(false)} />
             </div>
           )}
         </div>

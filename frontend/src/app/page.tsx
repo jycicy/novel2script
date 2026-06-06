@@ -42,11 +42,18 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen flex flex-col">
+    <main className="min-h-screen flex flex-col bg-gradient-to-b from-white to-gray-50">
       {/* Hero */}
       {!hasChapters && (
-        <section className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <h1 className="text-5xl font-bold mb-4">Novel2Scripts</h1>
+        <section className="flex-1 flex flex-col items-center justify-center p-8 text-center animate-[fadeIn_0.6s_ease-out]">
+          <div className="mb-6">
+            <span className="inline-block px-3 py-1 text-xs font-medium bg-blue-50 text-blue-600 rounded-full border border-blue-100">
+              七牛云 XEngineer 暑期实训营
+            </span>
+          </div>
+          <h1 className="text-5xl md:text-6xl font-bold mb-4 bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+            Novel2Scripts
+          </h1>
           <p className="text-xl text-gray-600 mb-2">
             AI 驱动的小说转剧本工具
           </p>
@@ -57,15 +64,19 @@ export default function Home() {
       )}
 
       {/* Input Area */}
-      <section className="py-8 px-8 max-w-3xl mx-auto w-full">
+      <section className={`py-8 px-4 sm:px-8 max-w-3xl mx-auto w-full ${hasChapters ? "pt-6" : ""}`}>
         {!hasChapters && <h2 className="text-xl font-semibold mb-4">输入小说文本</h2>}
         <NovelInput onSubmit={handleDetect} isLoading={isLoading} />
-        {error && <p className="mt-2 text-sm text-red-500">{error}</p>}
+        {error && (
+          <p className="mt-3 text-sm text-red-500 bg-red-50 px-4 py-2 rounded-lg border border-red-100">
+            {error}
+          </p>
+        )}
       </section>
 
       {/* Chapter List */}
       {hasChapters && (
-        <section className="py-4 px-8 max-w-3xl mx-auto w-full">
+        <section className="py-4 px-4 sm:px-8 max-w-3xl mx-auto w-full animate-[slideUp_0.3s_ease-out]">
           <ChapterSelector
             chapters={chapters}
             activeIndex={0}
@@ -73,44 +84,37 @@ export default function Home() {
           />
           <button
             onClick={handleStartConvert}
-            className="mt-4 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="mt-4 w-full sm:w-auto px-8 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-sm hover:shadow-md font-medium"
           >
-            开始转换
+            开始转换 →
           </button>
         </section>
       )}
 
       {/* Features */}
       {!hasChapters && (
-        <section className="py-16 px-8 bg-gray-50">
-          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-8">
-            <div className="text-center">
-              <div className="text-3xl mb-3">&#128221;</div>
-              <h3 className="font-semibold mb-2">智能章节检测</h3>
-              <p className="text-sm text-gray-600">
-                自动识别小说章节结构，支持多种格式
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl mb-3">&#127916;</div>
-              <h3 className="font-semibold mb-2">结构化剧本</h3>
-              <p className="text-sm text-gray-600">
-                场景、角色、对白、舞台指示
-              </p>
-            </div>
-            <div className="text-center">
-              <div className="text-3xl mb-3">&#128190;</div>
-              <h3 className="font-semibold mb-2">在线编辑导出</h3>
-              <p className="text-sm text-gray-600">
-                Monaco 编辑器，YAML / JSON 导出
-              </p>
-            </div>
+        <section className="py-16 px-4 sm:px-8">
+          <div className="max-w-4xl mx-auto grid grid-cols-1 sm:grid-cols-3 gap-6">
+            {[
+              { icon: "&#128221;", title: "智能章节检测", desc: "自动识别小说章节结构，支持多种格式" },
+              { icon: "&#127916;", title: "结构化剧本", desc: "场景、角色、对白、舞台指示" },
+              { icon: "&#128190;", title: "在线编辑导出", desc: "Monaco 编辑器，YAML / JSON 导出" },
+            ].map((f, i) => (
+              <div
+                key={i}
+                className="text-center p-6 rounded-xl bg-white border hover:shadow-lg hover:-translate-y-1 transition-all duration-300"
+              >
+                <div className="text-3xl mb-3" dangerouslySetInnerHTML={{ __html: f.icon }} />
+                <h3 className="font-semibold mb-2">{f.title}</h3>
+                <p className="text-sm text-gray-600">{f.desc}</p>
+              </div>
+            ))}
           </div>
         </section>
       )}
 
       <footer className="py-6 text-center text-sm text-gray-400">
-        Novel2Scripts - 七牛云 XEngineer 暑期实训营
+        Novel2Scripts — 七牛云 XEngineer 暑期实训营
       </footer>
     </main>
   );

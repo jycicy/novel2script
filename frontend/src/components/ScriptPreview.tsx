@@ -6,6 +6,14 @@ interface ScriptPreviewProps {
   screenplay: Screenplay;
 }
 
+const ROLE_COLORS: Record<string, string> = {
+  protagonist: "bg-blue-50 text-blue-700 border-blue-200",
+  antagonist: "bg-red-50 text-red-700 border-red-200",
+  supporting: "bg-green-50 text-green-700 border-green-200",
+  minor: "bg-gray-50 text-gray-600 border-gray-200",
+  narrator: "bg-purple-50 text-purple-700 border-purple-200",
+};
+
 export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
   const getCharacterName = (id: string): string => {
     const char = screenplay.characters.find((c) => c.id === id);
@@ -16,18 +24,18 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
     switch (block.type) {
       case "action":
         return (
-          <p key={idx} className="my-2 text-sm leading-relaxed">
+          <p key={idx} className="my-3 text-sm leading-relaxed text-gray-800">
             {block.text}
           </p>
         );
 
       case "dialogue":
         return (
-          <div key={idx} className="my-2">
-            <div className="text-center font-bold text-sm tracking-wide">
-              {getCharacterName(block.character || "").toUpperCase()}
+          <div key={idx} className="my-3">
+            <div className="text-center font-bold text-sm tracking-widest uppercase text-gray-900">
+              {getCharacterName(block.character || "")}
             </div>
-            <div className="mx-auto max-w-md text-center text-sm leading-relaxed">
+            <div className="mx-auto max-w-sm text-center text-sm leading-relaxed text-gray-700 mt-1 px-4">
               {block.dialogue}
             </div>
           </div>
@@ -42,15 +50,17 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
 
       case "transition":
         return (
-          <div key={idx} className="text-right text-sm font-medium my-2">
+          <div key={idx} className="text-right text-xs font-bold uppercase tracking-wider text-gray-500 my-4">
             {block.transition}
           </div>
         );
 
       case "scene_heading":
         return (
-          <div key={idx} className="font-bold text-sm my-4 border-b pb-1">
-            {block.text}
+          <div key={idx} className="mt-8 mb-3 pb-2 border-b-2 border-gray-800">
+            <span className="font-bold text-sm uppercase tracking-wide text-gray-900">
+              {block.text}
+            </span>
           </div>
         );
 
@@ -60,29 +70,38 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
   };
 
   return (
-    <div className="border rounded-lg overflow-hidden">
+    <div className="border rounded-lg overflow-hidden bg-white shadow-sm">
       {/* Header */}
-      <div className="px-6 py-4 bg-gray-50 border-b">
-        <h2 className="text-lg font-bold">{screenplay.meta.title}</h2>
-        <div className="text-xs text-gray-500 mt-1 flex gap-4">
-          <span>类型: {screenplay.meta.genre}</span>
-          <span>时长: {screenplay.meta.estimated_duration}</span>
-          <span>来源: {screenplay.meta.source_chapter}</span>
+      <div className="px-6 py-4 bg-gradient-to-r from-gray-50 to-white border-b">
+        <h2 className="text-lg font-bold text-gray-900">{screenplay.meta.title}</h2>
+        <div className="text-xs text-gray-500 mt-1.5 flex flex-wrap gap-3">
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-blue-400"></span>
+            {screenplay.meta.genre}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-green-400"></span>
+            {screenplay.meta.estimated_duration}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+            {screenplay.meta.source_chapter}
+          </span>
         </div>
       </div>
 
       {/* Characters */}
       {screenplay.characters.length > 0 && (
         <div className="px-6 py-3 border-b bg-gray-50/50">
-          <div className="text-xs text-gray-500 mb-1">角色</div>
+          <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">角色表</div>
           <div className="flex flex-wrap gap-2">
             {screenplay.characters.map((c) => (
               <span
                 key={c.id}
-                className="text-xs px-2 py-1 bg-white border rounded"
+                className={`text-xs px-2.5 py-1 rounded-full border ${ROLE_COLORS[c.role] || ROLE_COLORS.minor}`}
               >
                 {c.name}
-                <span className="text-gray-400 ml-1">({c.role})</span>
+                <span className="opacity-60 ml-1">· {c.role}</span>
               </span>
             ))}
           </div>
@@ -92,21 +111,27 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
       {/* Scenes */}
       <div className="p-6 font-mono">
         {screenplay.scenes.map((scene) => (
-          <div key={scene.scene_number} className="mb-8">
-            <div className="flex items-baseline gap-2 mb-2">
-              <span className="text-xs text-gray-400">
+          <div key={scene.scene_number} className="mb-10">
+            <div className="flex items-center gap-3 mb-2">
+              <span className="inline-block px-2 py-0.5 text-xs font-bold bg-gray-800 text-white rounded">
                 SCENE {scene.scene_number}
               </span>
-              <span className="font-bold text-sm">
+              <span className="font-bold text-sm text-gray-900">
                 {scene.heading}
               </span>
             </div>
+            <div className="flex gap-3 text-xs text-gray-400 mb-3 pl-1">
+              {scene.location && <span>📍 {scene.location}</span>}
+              {scene.time && <span>🕐 {scene.time}</span>}
+            </div>
             {scene.atmosphere && (
-              <p className="text-xs text-gray-500 italic mb-2">
+              <p className="text-xs text-gray-500 italic mb-3 pl-1 border-l-2 border-gray-200 ml-1">
                 {scene.atmosphere}
               </p>
             )}
-            {scene.content.map((block, idx) => renderBlock(block, idx))}
+            <div className="pl-2">
+              {scene.content.map((block, idx) => renderBlock(block, idx))}
+            </div>
           </div>
         ))}
       </div>

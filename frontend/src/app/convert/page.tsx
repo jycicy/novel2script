@@ -10,8 +10,9 @@ import CharacterPanel from "@/components/CharacterPanel";
 import ExportMenu from "@/components/ExportMenu";
 import SchemaViewer from "@/components/SchemaViewer";
 import StreamingPreview from "@/components/StreamingPreview";
+import AddChapterModal from "@/components/AddChapterModal";
 import { loadProject, saveProject } from "@/lib/storage";
-import { convertChapterStream } from "@/lib/api";
+import { convertChapterStream, detectChapters } from "@/lib/api";
 import type { ChapterInfo, Screenplay } from "@/types/screenplay";
 
 export default function ConvertPage() {
@@ -23,11 +24,15 @@ export default function ConvertPage() {
   const [error, setError] = useState("");
   const [statusMap, setStatusMap] = useState<Record<number, "pending" | "waiting" | "queued" | "converting" | "done" | "error">>({});
   const [streamingYaml, setStreamingYaml] = useState("");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [toast, setToast] = useState<{ message: string; type: "info" | "error" } | null>(null);
   const yamlScroll = useAutoScroll([streamingYaml]);
-  const cancelAllRef = useRef(false);    // 取消全部
-  const cancelCurrentRef = useRef(false); // 只取消当前章
+  const cancelAllRef = useRef(false);
+  const cancelCurrentRef = useRef(false);
   const abortRef = useRef<AbortController | null>(null);
   const queueRef = useRef<number[]>([]);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -61,19 +66,104 @@ export default function ConvertPage() {
     }
   }, [isConverting]);
 
-  // 取消当前正在转换的章节（不中断批量流程）
+  // ===== 章节管理 =====
+
+  const handleAddChapters = (newChapters: ChapterInfo[], novelText: string) => {
+    const startIndex = chapters.length;
+    const reindexed = newChapters.map((ch, i) => ({
+      ...ch,
+      index: startIndex + i,
+    }));
+    setChapters((prev) => [...prev, ...reindexed]);
+    setActiveIndex(startIndex);
+  };
+
+  const handleFileUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploading(true);
+    setError("");
+
+    try {
+      const allNewChapters: ChapterInfo[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const text = await file.text();
+        const detected = await detectChapters(text);
+        if (detected.length > 0) {
+          const startIndex = chapters.length + allNewChapters.length;
+          const reindexed = detected.map((ch, j) => ({
+            ...ch,
+            index: startIndex + j,
+          }));
+          allNewChapters.push(...reindexed);
+        }
+      }
+      if (allNewChapters.length > 0) {
+        setChapters((prev) => [...prev, ...allNewChapters]);
+        setActiveIndex(chapters.length);
+      } else {
+        setError("未从上传文件中检测到章节");
+      }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "文件处理失败");
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const showToast = (message: string, type: "info" | "error" = "info") => {
+    setToast({ message, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleDeleteChapter = (index: number) => {
+    const status = statusMap[index];
+    if (status === "converting" || status === "waiting" || status === "queued") {
+      showToast("该章节正在转换或排队中，请先取消后再删除", "error");
+      return;
+    }
+    setChapters((prev) => {
+      const next = prev.filter((ch) => ch.index !== index).map((ch, i) => ({ ...ch, index: i }));
+      return next;
+    });
+    setScreenplays((prev) => {
+      const next: Record<number, Screenplay> = {};
+      Object.entries(prev).forEach(([key, val]) => {
+        const k = Number(key);
+        if (k < index) next[k] = val;
+        else if (k > index) next[k - 1] = val;
+      });
+      return next;
+    });
+    setStatusMap((prev) => {
+      const next: Record<number, string> = {};
+      Object.entries(prev).forEach(([key, val]) => {
+        const k = Number(key);
+        if (k < index) next[k] = val;
+        else if (k > index) next[k - 1] = val;
+      });
+      return next as typeof statusMap;
+    });
+    setActiveIndex((prev) => {
+      if (prev === index) return 0;
+      if (prev > index) return prev - 1;
+      return prev;
+    });
+  };
+
+  // ===== 转换逻辑 =====
+
   const handleCancelCurrent = () => {
     cancelCurrentRef.current = true;
     abortRef.current?.abort();
   };
 
-  // 取消全部：中断批量流程，清空队列
   const handleCancelAll = () => {
     cancelAllRef.current = true;
     cancelCurrentRef.current = true;
     abortRef.current?.abort();
     queueRef.current = [];
-    // 重置所有非完成状态为 pending
     setStatusMap((prev) => {
       const next = { ...prev };
       for (const key of Object.keys(next)) {
@@ -157,12 +247,10 @@ export default function ConvertPage() {
     setIsConverting(true);
     setError("");
 
-    // 标记所有待转换章节为"等待中"
     const waitingStatus: Record<number, "waiting"> = {};
     pending.forEach((c) => (waitingStatus[c.index] = "waiting"));
     setStatusMap((prev) => ({ ...prev, ...waitingStatus }));
 
-    // 用本地变量追踪已完成的剧本，确保角色传递正确
     const results: Record<number, Screenplay> = { ...screenplays };
 
     try {
@@ -178,7 +266,6 @@ export default function ConvertPage() {
         setStreamingYaml("");
 
         try {
-          // 找到最近一个成功转换的章节的角色列表（跳过失败章节）
           let prevChars: Screenplay["characters"] | undefined;
           for (let j = chapter.index - 1; j >= 0; j--) {
             if (results[j]?.characters?.length) {
@@ -213,7 +300,6 @@ export default function ConvertPage() {
             break;
           }
           if (cancelCurrentRef.current) {
-            // 只取消当前章，标记为 pending，继续下一章
             setStatusMap((prev) => ({ ...prev, [chapter.index]: "pending" }));
             continue;
           }
@@ -268,13 +354,39 @@ export default function ConvertPage() {
       {/* Main Content */}
       <div className="flex-1 flex">
         {/* Left: Chapter Selector */}
-        <aside className="w-64 border-r p-4 overflow-y-auto">
+        <aside className="w-64 border-r p-4 overflow-y-auto flex flex-col gap-3">
+          {/* 添加章节按钮 */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="flex-1 px-3 py-2 text-xs bg-white border rounded-lg hover:bg-gray-50 transition flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+            >
+              <span>📄</span> {isUploading ? "处理中..." : "上传文件"}
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex-1 px-3 py-2 text-xs bg-white border rounded-lg hover:bg-gray-50 transition flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <span>📋</span> 粘贴文本
+            </button>
+          </div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".txt"
+            multiple
+            onChange={(e) => handleFileUpload(e.target.files)}
+            className="hidden"
+          />
+
           <ChapterSelector
             chapters={chapters}
             activeIndex={activeIndex}
             onSelect={setActiveIndex}
-            onConvertAll={handleConvertAll}
+            onConvertAll={chapters.length > 0 ? handleConvertAll : undefined}
             onCancel={handleCancelAll}
+            onDelete={handleDeleteChapter}
             isConverting={isConverting}
             statusMap={statusMap}
           />
@@ -286,7 +398,7 @@ export default function ConvertPage() {
           <div className="flex gap-2 mb-4">
             <button
               onClick={() => setViewMode("preview")}
-              className={`px-3 py-1.5 text-sm rounded ${
+              className={`px-3 py-1.5 text-sm rounded cursor-pointer ${
                 viewMode === "preview"
                   ? "bg-blue-600 text-white"
                   : "border hover:bg-gray-50"
@@ -296,7 +408,7 @@ export default function ConvertPage() {
             </button>
             <button
               onClick={() => setViewMode("editor")}
-              className={`px-3 py-1.5 text-sm rounded ${
+              className={`px-3 py-1.5 text-sm rounded cursor-pointer ${
                 viewMode === "editor"
                   ? "bg-blue-600 text-white"
                   : "border hover:bg-gray-50"
@@ -306,7 +418,7 @@ export default function ConvertPage() {
             </button>
             <button
               onClick={() => setViewMode("schema")}
-              className={`px-3 py-1.5 text-sm rounded ${
+              className={`px-3 py-1.5 text-sm rounded cursor-pointer ${
                 viewMode === "schema"
                   ? "bg-purple-600 text-white"
                   : "border hover:bg-gray-50"
@@ -317,7 +429,7 @@ export default function ConvertPage() {
             {statusMap[activeIndex] === "converting" ? (
               <button
                 onClick={handleCancelCurrent}
-                className="ml-auto px-4 py-1.5 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition"
+                className="ml-auto px-4 py-1.5 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition cursor-pointer"
               >
                 取消转换
               </button>
@@ -325,7 +437,6 @@ export default function ConvertPage() {
               <button
                 onClick={() => {
                   if (isConverting) {
-                    // 正在转换中，加入队列
                     queueRef.current.push(activeIndex);
                     setStatusMap((prev) => ({ ...prev, [activeIndex]: "queued" }));
                     setActiveIndex(activeIndex);
@@ -333,7 +444,7 @@ export default function ConvertPage() {
                     handleConvert(activeIndex);
                   }
                 }}
-                className="ml-auto px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
+                className="ml-auto px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition cursor-pointer"
               >
                 {isConverting ? "加入队列" : "转换此章"}
               </button>
@@ -347,7 +458,7 @@ export default function ConvertPage() {
               <p className="text-sm text-red-600 flex-1">{error}</p>
               <button
                 onClick={() => handleConvert(activeIndex)}
-                className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition"
+                className="text-xs px-3 py-1 bg-red-600 text-white rounded hover:bg-red-700 transition cursor-pointer"
               >
                 重试
               </button>
@@ -378,7 +489,7 @@ export default function ConvertPage() {
                 <span className="text-sm text-gray-600">正在生成剧本…</span>
                 <button
                   onClick={handleCancelCurrent}
-                  className="ml-auto text-xs px-3 py-1 border border-red-300 text-red-500 rounded hover:bg-red-50 transition"
+                  className="ml-auto text-xs px-3 py-1 border border-red-300 text-red-500 rounded hover:bg-red-50 transition cursor-pointer"
                 >
                   取消转换
                 </button>
@@ -396,7 +507,7 @@ export default function ConvertPage() {
                   {!yamlScroll.isAtBottom && (
                     <button
                       onClick={yamlScroll.scrollToBottom}
-                      className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-full shadow-md hover:bg-gray-50 transition flex items-center gap-1"
+                      className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-full shadow-md hover:bg-gray-50 transition flex items-center gap-1 cursor-pointer"
                     >
                       <span>↓</span> 回到底部
                     </button>
@@ -412,6 +523,11 @@ export default function ConvertPage() {
               <p className="text-lg mb-1 text-gray-500">排队等待中…</p>
               <p className="text-sm text-gray-400">前面的章节转换完成后将自动开始</p>
             </div>
+          ) : chapters.length === 0 ? (
+            <div className="text-center text-gray-400 py-20">
+              <p className="text-lg mb-2">暂无章节</p>
+              <p className="text-sm">请上传文件或粘贴文本添加小说章节</p>
+            </div>
           ) : !error ? (
             <div className="text-center text-gray-400 py-20">
               <p className="text-lg mb-2">暂无剧本内容</p>
@@ -425,6 +541,25 @@ export default function ConvertPage() {
           <CharacterPanel characters={currentScreenplay?.characters || []} />
         </aside>
       </div>
+
+      {/* Add Chapter Modal */}
+      {showAddModal && (
+        <AddChapterModal
+          onAdd={handleAddChapters}
+          onClose={() => setShowAddModal(false)}
+        />
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg text-sm text-white animate-[slideUp_0.3s_ease-out] ${
+            toast.type === "error" ? "bg-red-500" : "bg-gray-800"
+          }`}
+        >
+          {toast.message}
+        </div>
+      )}
     </main>
   );
 }

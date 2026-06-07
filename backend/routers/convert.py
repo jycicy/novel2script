@@ -121,3 +121,44 @@ async def convert_stream(req: BatchConvertRequest):
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@router.post("/api/convert/single/stream")
+async def convert_single_stream(req: ConvertRequest):
+    """单章流式转换：SSE 逐块返回 YAML，最终返回验证后的完整剧本。"""
+    system_prompt, user_content = build_conversion_prompt(
+        req.chapter_text,
+        [c.model_dump() for c in req.previous_characters] if req.previous_characters else None,
+    )
+
+    async def generate():
+        accumulated = []
+        try:
+            async for chunk in llm_service.stream_chapter(user_content, system_prompt):
+                accumulated.append(chunk)
+                yield f"data: {json.dumps({'type': 'chunk', 'content': chunk})}\n\n"
+
+            raw_yaml = "".join(accumulated)
+
+            # 去除 markdown 代码块
+            if raw_yaml.startswith("```"):
+                raw_yaml = raw_yaml.split("\n", 1)[1]
+                if raw_yaml.endswith("```"):
+                    raw_yaml = raw_yaml[:-3]
+            raw_yaml = raw_yaml.strip()
+
+            screenplay, errors = validate_screenplay_yaml(raw_yaml)
+
+            if screenplay is None:
+                error_msgs = [e.message for e in errors[:5]]
+                yield f"data: {json.dumps({'type': 'error', 'message': 'LLM 输出不符合 Schema', 'errors': error_msgs, 'raw_yaml': raw_yaml})}\n\n"
+            else:
+                yield f"data: {json.dumps({'type': 'done', 'screenplay': screenplay.model_dump()})}\n\n"
+        except Exception as e:
+            yield f"data: {json.dumps({'type': 'error', 'message': f'LLM 调用失败: {str(e)}'})}\n\n"
+
+    return StreamingResponse(
+        generate(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

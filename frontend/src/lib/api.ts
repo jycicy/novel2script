@@ -81,6 +81,83 @@ export async function convertChapter(req: ConvertRequest, signal?: AbortSignal):
   return res.screenplay;
 }
 
+export interface StreamCallbacks {
+  onChunk: (yaml: string) => void;
+  onDone: (screenplay: Screenplay) => void;
+  onError: (message: string, rawYaml?: string) => void;
+}
+
+export async function convertChapterStream(
+  req: ConvertRequest,
+  callbacks: StreamCallbacks,
+  signal?: AbortSignal,
+): Promise<void> {
+  const BASE = process.env.NEXT_PUBLIC_API_URL || "";
+  const url = `${BASE}/api/convert/single/stream`;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000);
+
+  // 外部 abort 信号转发
+  if (signal) {
+    if (signal.aborted) {
+      clearTimeout(timeout);
+      throw new Error("请求已取消");
+    }
+    signal.addEventListener("abort", () => controller.abort(), { once: true });
+  }
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(req),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      clearTimeout(timeout);
+      throw new Error(
+        (body as { detail?: string }).detail ?? ERROR_MAP[res.status] ?? `请求失败 (${res.status})`,
+      );
+    }
+
+    const reader = res.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const data = JSON.parse(line.slice(6));
+
+        if (data.type === "chunk") {
+          callbacks.onChunk(data.content);
+        } else if (data.type === "done") {
+          callbacks.onDone(data.screenplay);
+        } else if (data.type === "error") {
+          callbacks.onError(data.message, data.raw_yaml);
+          return; // 不 throw，让回调处理
+        }
+      }
+    }
+  } catch (e) {
+    if ((e as Error).name === "AbortError") {
+      throw new Error("请求已取消");
+    }
+    throw e;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
 export interface ValidateResponse {
   valid: boolean;
   errors: { line?: number; message: string }[];

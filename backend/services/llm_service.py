@@ -1,5 +1,6 @@
 import logging
 import asyncio
+from collections.abc import AsyncGenerator
 
 from openai import AsyncOpenAI
 
@@ -9,6 +10,19 @@ logger = logging.getLogger(__name__)
 
 MAX_RETRIES = 3
 BASE_DELAY = 1.0
+
+
+def _build_user_content(chapter_text: str, previous_characters: list[dict] | None) -> str:
+    if not previous_characters:
+        return chapter_text
+    char_info = "\n".join(
+        f"- {c['id']}: {c['name']} ({c['role']})"
+        for c in previous_characters
+    )
+    return (
+        f"PREVIOUS CHARACTERS (use same IDs if they appear):\n{char_info}\n\n"
+        f"CHAPTER TEXT:\n{chapter_text}"
+    )
 
 
 class LLMService:
@@ -27,16 +41,7 @@ class LLMService:
         system_prompt: str,
         previous_characters: list[dict] | None = None,
     ) -> str:
-        user_content = chapter_text
-        if previous_characters:
-            char_info = "\n".join(
-                f"- {c['id']}: {c['name']} ({c['role']})"
-                for c in previous_characters
-            )
-            user_content = (
-                f"PREVIOUS CHARACTERS (use same IDs if they appear):\n{char_info}\n\n"
-                f"CHAPTER TEXT:\n{chapter_text}"
-            )
+        user_content = _build_user_content(chapter_text, previous_characters)
 
         last_error = None
         for attempt in range(MAX_RETRIES):
@@ -68,6 +73,33 @@ class LLMService:
                     await asyncio.sleep(delay)
 
         raise last_error
+
+    async def stream_chapter(
+        self,
+        chapter_text: str,
+        system_prompt: str,
+        previous_characters: list[dict] | None = None,
+    ) -> AsyncGenerator[str, None]:
+        """流式输出 LLM 生成的 YAML 文本，逐块 yield。"""
+        user_content = _build_user_content(chapter_text, previous_characters)
+
+        stream = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_content},
+            ],
+            max_tokens=self.max_tokens,
+            temperature=self.temperature,
+            stream=True,
+        )
+
+        async for chunk in stream:
+            if not chunk.choices:
+                continue
+            delta = chunk.choices[0].delta
+            if delta.content:
+                yield delta.content
 
 
 llm_service = LLMService()

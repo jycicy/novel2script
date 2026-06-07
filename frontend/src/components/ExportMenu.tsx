@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import type { Screenplay } from "@/types/screenplay";
+import type { Screenplay, ChapterInfo } from "@/types/screenplay";
 import { exportAsYaml, exportAsJson, downloadFile } from "@/lib/storage";
+import BatchExportModal from "./BatchExportModal";
 
 interface ExportMenuProps {
   screenplay: Screenplay;
+  chapters?: ChapterInfo[];
+  screenplays?: Record<number, Screenplay>;
 }
 
 const ROLE_LABELS: Record<string, string> = {
@@ -16,7 +19,7 @@ const ROLE_LABELS: Record<string, string> = {
   narrator: "旁白",
 };
 
-function buildPdfHtml(s: Screenplay): string {
+export function buildPdfHtml(s: Screenplay): string {
   const characterMap = new Map(s.characters.map((c) => [c.id, c.name]));
 
   const renderContent = (s: Screenplay) =>
@@ -83,10 +86,11 @@ function buildPdfHtml(s: Screenplay): string {
 </body></html>`;
 }
 
-export default function ExportMenu({ screenplay }: ExportMenuProps) {
+export default function ExportMenu({ screenplay, chapters, screenplays }: ExportMenuProps) {
   const [open, setOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [showBatch, setShowBatch] = useState(false);
 
   const filename = screenplay.meta.title || "screenplay";
 
@@ -131,51 +135,74 @@ export default function ExportMenu({ screenplay }: ExportMenuProps) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(!open)}
-        disabled={exporting}
-        className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
-      >
-        {exporting ? "导出中…" : "导出 ▾"}
-      </button>
+  const hasBatch = chapters && screenplays;
 
-      {open && (
-        <>
-          <div
-            className="fixed inset-0 z-10"
-            onClick={() => setOpen(false)}
-          />
-          <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow-lg z-20 py-1">
-            <button
-              onClick={handleDownloadPdf}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
-            >
-              下载 PDF
-            </button>
-            <button
-              onClick={handleDownloadYaml}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
-            >
-              下载 YAML
-            </button>
-            <button
-              onClick={handleDownloadJson}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
-            >
-              下载 JSON
-            </button>
-            <hr className="my-1" />
-            <button
-              onClick={handleCopy}
-              className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
-            >
-              {copied ? "已复制 ✓" : "复制 JSON"}
-            </button>
-          </div>
-        </>
+  return (
+    <>
+      <div className="relative">
+        <button
+          onClick={() => setOpen(!open)}
+          disabled={exporting}
+          className="px-3 py-1.5 text-sm border rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+        >
+          {exporting ? "导出中…" : "导出 ▾"}
+        </button>
+
+        {open && (
+          <>
+            <div
+              className="fixed inset-0 z-10"
+              onClick={() => setOpen(false)}
+            />
+            <div className="absolute right-0 mt-1 w-44 bg-white border rounded-lg shadow-lg z-20 py-1">
+              <button
+                onClick={handleDownloadPdf}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
+              >
+                下载 PDF
+              </button>
+              <button
+                onClick={handleDownloadYaml}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
+              >
+                下载 YAML
+              </button>
+              <button
+                onClick={handleDownloadJson}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
+              >
+                下载 JSON
+              </button>
+              <hr className="my-1" />
+              <button
+                onClick={handleCopy}
+                className="w-full text-left px-4 py-2 text-sm hover:bg-gray-50 transition"
+              >
+                {copied ? "已复制 ✓" : "复制 JSON"}
+              </button>
+              {hasBatch && (
+                <>
+                  <hr className="my-1" />
+                  <button
+                    onClick={() => { setShowBatch(true); setOpen(false); }}
+                    className="w-full text-left px-4 py-2 text-sm text-blue-600 font-medium hover:bg-blue-50 transition"
+                  >
+                    批量导出…
+                  </button>
+                </>
+              )}
+            </div>
+          </>
+        )}
+      </div>
+
+      {showBatch && chapters && screenplays && (
+        <BatchExportModal
+          chapters={chapters}
+          screenplays={screenplays}
+          onClose={() => setShowBatch(false)}
+        />
       )}
-    </div>
+    </>
   );
 }

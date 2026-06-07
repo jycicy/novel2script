@@ -32,9 +32,21 @@ def repair_common_yaml_errors(raw: str) -> str:
         m = re.match(r'^(\s*[\w_]+:\s*)"(.+)$', line)
         if m and not line.rstrip().endswith('"'):
             indent, content = m.group(1), m.group(2)
-            # 去掉内容中可能混入的多余引号，统一补一个闭合引号
             content = content.rstrip('"').rstrip()
             line = f'{indent}"{content}"'
+
+        # 6. 修复值以 [ 开头但不是 YAML 数组的情况
+        #    例如 text: [V.O.] 内容 → text: "[V.O.] 内容"
+        #    判断依据：[ 和 ] 之间没有逗号，且 ] 后面还有内容
+        m2 = re.match(r'^(\s*[\w_]+:\s*)\[(.+)$', line)
+        if m2 and not re.match(r'^\s*[\w_]+:\s*\[.*?,.*?\]', line):
+            indent, content = m2.group(1), m2.group(2)
+            # 补上开头丢失的 [
+            line = f'{indent}"[{content}"'
+            # 如果行尾没有闭合引号，补上
+            if not line.rstrip().endswith('"'):
+                line = line.rstrip() + '"'
+
         fixed_lines.append(line)
 
     return "\n".join(fixed_lines)

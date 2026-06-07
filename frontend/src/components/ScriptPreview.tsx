@@ -117,7 +117,7 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
       )}
 
       {/* Scenes */}
-      <div className="p-6 font-mono">
+      <div className="p-6 font-mono overflow-y-auto" style={{ maxHeight: "500px" }}>
         {screenplay.scenes.map((scene) => (
           <div key={scene.scene_number} className="mb-10">
             <div className="flex items-center gap-3 mb-2">

@@ -16,7 +16,7 @@ function getErrorMessage(status: number): string {
 
 async function request<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 120000); // 120s 超时
+  const timeout = setTimeout(() => controller.abort(), 300000); // 5min 超时
 
   // 外部取消信号
   if (options?.signal) {

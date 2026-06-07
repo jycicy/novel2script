@@ -28,18 +28,19 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
     return char?.name || id;
   };
 
-  const renderBlock = (block: ContentBlock, idx: number) => {
+  const renderBlock = (block: ContentBlock, key: string | number) => {
+    if (!block) return null;
     switch (block.type) {
       case "action":
         return (
-          <p key={idx} className="my-3 text-sm leading-relaxed text-gray-800">
+          <p key={key} className="my-3 text-sm leading-relaxed text-gray-800">
             {block.text}
           </p>
         );
 
       case "dialogue":
         return (
-          <div key={idx} className="my-3">
+          <div key={key} className="my-3">
             <div className="text-center font-bold text-sm text-gray-900">
               {getCharacterName(block.character || "")}
             </div>
@@ -51,21 +52,21 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
 
       case "parenthetical":
         return (
-          <div key={idx} className="text-center text-xs text-gray-500 italic my-1">
+          <div key={key} className="text-center text-xs text-gray-500 italic my-1">
             ({block.parenthetical})
           </div>
         );
 
       case "transition":
         return (
-          <div key={idx} className="text-right text-xs font-bold uppercase tracking-wider text-gray-500 my-4">
+          <div key={key} className="text-right text-xs font-bold uppercase tracking-wider text-gray-500 my-4">
             {block.transition}
           </div>
         );
 
       case "scene_heading":
         return (
-          <div key={idx} className="mt-8 mb-3 pb-2 border-b-2 border-gray-800">
+          <div key={key} className="mt-8 mb-3 pb-2 border-b-2 border-gray-800">
             <span className="font-bold text-sm uppercase tracking-wide text-gray-900">
               {block.text}
             </span>
@@ -103,13 +104,13 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
         <div className="px-6 py-3 border-b bg-gray-50/50">
           <div className="text-xs text-gray-500 mb-2 font-medium uppercase tracking-wide">角色表</div>
           <div className="flex flex-wrap gap-2">
-            {screenplay.characters.map((c) => (
+            {screenplay.characters.filter(Boolean).map((c, i) => (
               <span
-                key={c.id}
-                className={`text-xs px-2.5 py-1 rounded-full border ${ROLE_COLORS[c.role] || ROLE_COLORS.minor}`}
+                key={c.id || i}
+                className={`text-xs px-2.5 py-1 rounded-full border ${ROLE_COLORS[c.role || ""] || ROLE_COLORS.minor}`}
               >
                 {c.name}
-                <span className="opacity-60 ml-1">· {ROLE_LABELS[c.role] || c.role}</span>
+                <span className="opacity-60 ml-1">· {ROLE_LABELS[c.role || ""] || c.role || ""}</span>
               </span>
             ))}
           </div>
@@ -118,14 +119,14 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
 
       {/* Scenes */}
       <div className="p-6 font-mono overflow-y-auto" style={{ maxHeight: "500px" }}>
-        {screenplay.scenes.map((scene) => (
-          <div key={scene.scene_number} className="mb-10">
+        {screenplay.scenes.filter(Boolean).map((scene, sceneIdx) => (
+          <div key={sceneIdx} className="mb-10">
             <div className="flex items-center gap-3 mb-2">
               <span className="inline-block px-2 py-0.5 text-xs font-bold bg-gray-800 text-white rounded">
-                场景 {scene.scene_number}
+                场景 {scene.scene_number ?? "?"}
               </span>
               <span className="font-bold text-sm text-gray-900">
-                {scene.heading}
+                {scene.heading || ""}
               </span>
             </div>
             <div className="flex gap-3 text-xs text-gray-400 mb-3 pl-1">
@@ -138,7 +139,7 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
               </p>
             )}
             <div className="pl-2">
-              {scene.content.map((block, idx) => renderBlock(block, idx))}
+              {(scene.content || []).filter(Boolean).map((block, idx) => renderBlock(block, `${sceneIdx}-${idx}`))}
             </div>
           </div>
         ))}

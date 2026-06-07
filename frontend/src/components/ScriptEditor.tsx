@@ -9,15 +9,18 @@ interface ScriptEditorProps {
   screenplay: Screenplay;
   onChange: (yamlText: string) => void;
   onValidate?: (screenplay: Screenplay) => void;
+  onSave?: (screenplay: Screenplay) => void;
 }
 
 export default function ScriptEditor({
   screenplay,
   onChange,
   onValidate,
+  onSave,
 }: ScriptEditorProps) {
   const [yamlText, setYamlText] = useState("");
   const [errors, setErrors] = useState<string[]>([]);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const text = yaml.dump(screenplay, { lineWidth: -1, noRefs: true });
@@ -27,6 +30,7 @@ export default function ScriptEditor({
   const handleChange = (value: string | undefined) => {
     const text = value || "";
     setYamlText(text);
+    setSaved(false);
     onChange(text);
 
     // Validate
@@ -42,14 +46,45 @@ export default function ScriptEditor({
     }
   };
 
+  const handleSave = () => {
+    if (!onSave) return;
+    try {
+      const data = yaml.load(yamlText);
+      if (data && typeof data === "object") {
+        onSave(data as Screenplay);
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2000);
+      }
+    } catch {
+      // 有语法错误时不允许保存
+    }
+  };
+
   return (
     <div className="border rounded-lg overflow-hidden">
       {/* Header */}
       <div className="px-4 py-2 bg-gray-50 border-b flex items-center justify-between">
         <span className="text-sm font-medium">YAML 编辑器</span>
-        {errors.length > 0 && (
-          <span className="text-xs text-red-500">{errors[0]}</span>
-        )}
+        <div className="flex items-center gap-2">
+          {errors.length > 0 && (
+            <span className="text-xs text-red-500">{errors[0]}</span>
+          )}
+          {onSave && (
+            <button
+              onClick={handleSave}
+              disabled={errors.length > 0}
+              className={`px-3 py-1 text-xs rounded transition ${
+                saved
+                  ? "bg-green-100 text-green-700"
+                  : errors.length > 0
+                    ? "bg-gray-100 text-gray-400 cursor-not-allowed"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              {saved ? "✓ 已保存" : "保存修改"}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Editor */}

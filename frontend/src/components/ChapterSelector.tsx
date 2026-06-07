@@ -2,7 +2,7 @@
 
 import type { ChapterInfo } from "@/types/screenplay";
 
-type ChapterStatus = "pending" | "converting" | "done" | "error";
+type ChapterStatus = "pending" | "waiting" | "converting" | "done" | "error";
 
 interface ChapterSelectorProps {
   chapters: ChapterInfo[];
@@ -21,6 +21,7 @@ export default function ChapterSelector({
 }: ChapterSelectorProps) {
   const statusIcon: Record<ChapterStatus, string> = {
     pending: "○",
+    waiting: "◷",
     converting: "⏳",
     done: "✅",
     error: "❌",
@@ -28,6 +29,7 @@ export default function ChapterSelector({
 
   const statusColor: Record<ChapterStatus, string> = {
     pending: "text-gray-400",
+    waiting: "text-gray-400",
     converting: "text-blue-500 animate-pulse",
     done: "text-green-600",
     error: "text-red-500",

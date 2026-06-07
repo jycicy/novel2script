@@ -9,18 +9,17 @@ import CharacterPanel from "@/components/CharacterPanel";
 import ExportMenu from "@/components/ExportMenu";
 import SchemaViewer from "@/components/SchemaViewer";
 import { loadProject, saveProject } from "@/lib/storage";
-import { convertChapter, convertStream } from "@/lib/api";
+import { convertChapter } from "@/lib/api";
 import type { ChapterInfo, Screenplay } from "@/types/screenplay";
 
 export default function ConvertPage() {
   const [chapters, setChapters] = useState<ChapterInfo[]>([]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [screenplays, setScreenplays] = useState<Record<number, Screenplay>>({});
-  const [viewMode, setViewMode] = useState<"preview" | "editor">("preview");
-  const [showSchema, setShowSchema] = useState(false);
+  const [viewMode, setViewMode] = useState<"preview" | "editor" | "schema">("preview");
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState("");
-  const [statusMap, setStatusMap] = useState<Record<number, "pending" | "converting" | "done" | "error">>({});
+  const [statusMap, setStatusMap] = useState<Record<number, "pending" | "waiting" | "converting" | "done" | "error">>({});
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -87,32 +86,44 @@ export default function ConvertPage() {
     setIsConverting(true);
     setError("");
 
-    // 标记所有待转换章节为 converting
-    const newStatus: Record<number, "converting"> = {};
-    pending.forEach((c) => (newStatus[c.index] = "converting"));
-    setStatusMap((prev) => ({ ...prev, ...newStatus }));
+    // 标记所有待转换章节为"等待中"
+    const waitingStatus: Record<number, "waiting"> = {};
+    pending.forEach((c) => (waitingStatus[c.index] = "waiting"));
+    setStatusMap((prev) => ({ ...prev, ...waitingStatus }));
 
     // 自动跳到第一个待转换章节
     setActiveIndex(pending[0].index);
 
+    // 用本地变量追踪已完成的剧本，确保角色传递正确
+    const results: Record<number, Screenplay> = { ...screenplays };
+
     try {
-      await convertStream(
-        pending.map((c) => ({
-          chapter_text: c.content,
-          chapter_index: c.index,
-          title: c.title,
-        })),
-        (event) => {
-          if (event.type === "chapter_done" && event.index !== undefined && event.screenplay) {
-            setScreenplays((prev) => ({ ...prev, [event.index!]: event.screenplay! }));
-            setStatusMap((prev) => ({ ...prev, [event.index!]: "done" }));
-          } else if (event.type === "error" && event.index !== undefined) {
-            setStatusMap((prev) => ({ ...prev, [event.index!]: "error" }));
-          }
-        },
-      );
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "批量转换失败");
+      // 逐章转换，每完成一章立刻显示
+      for (let i = 0; i < pending.length; i++) {
+        const chapter = pending[i];
+        setStatusMap((prev) => ({ ...prev, [chapter.index]: "converting" }));
+        setActiveIndex(chapter.index);
+
+        try {
+          const prevChars = chapter.index > 0 ? results[chapter.index - 1]?.characters : undefined;
+          const result = await convertChapter({
+            chapter_text: chapter.content,
+            chapter_index: chapter.index,
+            title: chapter.title,
+            previous_characters: prevChars?.map((c) => ({
+              id: c.id,
+              name: c.name,
+              role: c.role,
+            })),
+          });
+          results[chapter.index] = result;
+          setScreenplays((prev) => ({ ...prev, [chapter.index]: result }));
+          setStatusMap((prev) => ({ ...prev, [chapter.index]: "done" }));
+        } catch (e) {
+          setStatusMap((prev) => ({ ...prev, [chapter.index]: "error" }));
+          console.error(`章节 ${chapter.title} 转换失败:`, e);
+        }
+      }
     } finally {
       setIsConverting(false);
     }
@@ -168,16 +179,16 @@ export default function ConvertPage() {
               编辑
             </button>
             <button
-              onClick={() => setShowSchema(!showSchema)}
+              onClick={() => setViewMode("schema")}
               className={`px-3 py-1.5 text-sm rounded ${
-                showSchema
+                viewMode === "schema"
                   ? "bg-purple-600 text-white"
                   : "border hover:bg-gray-50"
               }`}
             >
               Schema
             </button>
-            {!currentScreenplay && statusMap[activeIndex] !== "converting" && (
+            {!currentScreenplay && statusMap[activeIndex] !== "converting" && statusMap[activeIndex] !== "waiting" && (
               <button
                 onClick={() => handleConvert(activeIndex)}
                 className="ml-auto px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
@@ -202,26 +213,35 @@ export default function ConvertPage() {
           )}
 
           {/* Content */}
-          {currentScreenplay && (
+          {viewMode === "schema" ? (
+            <SchemaViewer />
+          ) : currentScreenplay ? (
             <>
               {viewMode === "preview" ? (
                 <ScriptPreview screenplay={currentScreenplay} />
               ) : (
                 <ScriptEditor
                   screenplay={currentScreenplay}
-                  onChange={(text) => console.log("edited", text.length)}
+                  onChange={() => {}}
+                  onSave={(updated) => {
+                    setScreenplays((prev) => ({ ...prev, [activeIndex]: updated }));
+                  }}
                 />
               )}
             </>
-          )}
-
-          {!currentScreenplay && !error && (
+          ) : !error ? (
             <div className="text-center text-gray-400 py-20">
               {statusMap[activeIndex] === "converting" ? (
                 <>
                   <div className="inline-block w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
                   <p className="text-lg mb-1 text-gray-600">正在转换当前章节…</p>
                   <p className="text-sm text-gray-400">转换完成后将自动显示</p>
+                </>
+              ) : statusMap[activeIndex] === "waiting" ? (
+                <>
+                  <div className="inline-block w-8 h-8 border-3 border-gray-200 border-t-gray-400 rounded-full animate-spin mb-3" />
+                  <p className="text-lg mb-1 text-gray-500">排队等待中…</p>
+                  <p className="text-sm text-gray-400">前面的章节转换完成后将自动开始</p>
                 </>
               ) : (
                 <>
@@ -230,14 +250,7 @@ export default function ConvertPage() {
                 </>
               )}
             </div>
-          )}
-
-          {/* Schema Viewer */}
-          {showSchema && (
-            <div className="mt-4">
-              <SchemaViewer onClose={() => setShowSchema(false)} />
-            </div>
-          )}
+          ) : null}
         </div>
 
         {/* Right: Character Panel */}

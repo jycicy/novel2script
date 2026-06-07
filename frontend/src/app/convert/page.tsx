@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import ChapterSelector from "@/components/ChapterSelector";
 import ScriptPreview from "@/components/ScriptPreview";
@@ -19,7 +19,10 @@ export default function ConvertPage() {
   const [viewMode, setViewMode] = useState<"preview" | "editor" | "schema">("preview");
   const [isConverting, setIsConverting] = useState(false);
   const [error, setError] = useState("");
-  const [statusMap, setStatusMap] = useState<Record<number, "pending" | "waiting" | "converting" | "done" | "error">>({});
+  const [statusMap, setStatusMap] = useState<Record<number, "pending" | "waiting" | "queued" | "converting" | "done" | "error">>({});
+  const cancelRef = useRef(false);
+  const abortRef = useRef<AbortController | null>(null);
+  const queueRef = useRef<number[]>([]);
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -45,9 +48,37 @@ export default function ConvertPage() {
 
   const currentScreenplay = screenplays[activeIndex];
 
+  // 转换队列：当前转换完成后自动处理下一个
+  useEffect(() => {
+    if (!isConverting && queueRef.current.length > 0) {
+      const nextIndex = queueRef.current.shift()!;
+      handleConvert(nextIndex);
+    }
+  }, [isConverting]);
+
+  const handleCancel = () => {
+    cancelRef.current = true;
+    abortRef.current?.abort();
+    queueRef.current = [];
+    // 重置所有非完成状态为 pending
+    setStatusMap((prev) => {
+      const next = { ...prev };
+      for (const key of Object.keys(next)) {
+        if (next[Number(key)] !== "done") {
+          next[Number(key)] = "pending";
+        }
+      }
+      return next;
+    });
+  };
+
   const handleConvert = async (index: number) => {
     const chapter = chapters[index];
     if (!chapter) return;
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+    cancelRef.current = false;
 
     setStatusMap((prev) => ({ ...prev, [index]: "converting" }));
     setIsConverting(true);
@@ -55,7 +86,6 @@ export default function ConvertPage() {
     setActiveIndex(index);
 
     try {
-      // Get previous chapter's characters for consistency
       const prevChars = index > 0 ? screenplays[index - 1]?.characters : undefined;
 
       const result = await convertChapter({
@@ -67,15 +97,25 @@ export default function ConvertPage() {
           name: c.name,
           role: c.role,
         })),
-      });
+      }, controller.signal);
+
+      if (cancelRef.current) {
+        setStatusMap((prev) => ({ ...prev, [index]: "pending" }));
+        return;
+      }
 
       setScreenplays((prev) => ({ ...prev, [index]: result }));
       setStatusMap((prev) => ({ ...prev, [index]: "done" }));
     } catch (e) {
+      if (cancelRef.current) {
+        setStatusMap((prev) => ({ ...prev, [index]: "pending" }));
+        return;
+      }
       setError(e instanceof Error ? e.message : "转换失败");
       setStatusMap((prev) => ({ ...prev, [index]: "error" }));
     } finally {
       setIsConverting(false);
+      abortRef.current = null;
     }
   };
 
@@ -83,6 +123,7 @@ export default function ConvertPage() {
     const pending = chapters.filter((c) => statusMap[c.index] !== "done");
     if (pending.length === 0) return;
 
+    cancelRef.current = false;
     setIsConverting(true);
     setError("");
 
@@ -98,9 +139,13 @@ export default function ConvertPage() {
     const results: Record<number, Screenplay> = { ...screenplays };
 
     try {
-      // 逐章转换，每完成一章立刻显示
       for (let i = 0; i < pending.length; i++) {
+        if (cancelRef.current) break;
+
         const chapter = pending[i];
+        const controller = new AbortController();
+        abortRef.current = controller;
+
         setStatusMap((prev) => ({ ...prev, [chapter.index]: "converting" }));
         setActiveIndex(chapter.index);
 
@@ -115,17 +160,28 @@ export default function ConvertPage() {
               name: c.name,
               role: c.role,
             })),
-          });
+          }, controller.signal);
+
+          if (cancelRef.current) {
+            setStatusMap((prev) => ({ ...prev, [chapter.index]: "pending" }));
+            break;
+          }
+
           results[chapter.index] = result;
           setScreenplays((prev) => ({ ...prev, [chapter.index]: result }));
           setStatusMap((prev) => ({ ...prev, [chapter.index]: "done" }));
         } catch (e) {
+          if (cancelRef.current) {
+            setStatusMap((prev) => ({ ...prev, [chapter.index]: "pending" }));
+            break;
+          }
           setStatusMap((prev) => ({ ...prev, [chapter.index]: "error" }));
           console.error(`章节 ${chapter.title} 转换失败:`, e);
         }
       }
     } finally {
       setIsConverting(false);
+      abortRef.current = null;
     }
   };
 
@@ -150,6 +206,8 @@ export default function ConvertPage() {
             activeIndex={activeIndex}
             onSelect={setActiveIndex}
             onConvertAll={handleConvertAll}
+            onCancel={handleCancel}
+            isConverting={isConverting}
             statusMap={statusMap}
           />
         </aside>
@@ -188,14 +246,30 @@ export default function ConvertPage() {
             >
               Schema
             </button>
-            {!currentScreenplay && statusMap[activeIndex] !== "converting" && statusMap[activeIndex] !== "waiting" && (
+            {statusMap[activeIndex] === "converting" ? (
               <button
-                onClick={() => handleConvert(activeIndex)}
+                onClick={handleCancel}
+                className="ml-auto px-4 py-1.5 text-sm bg-red-500 text-white rounded hover:bg-red-600 transition"
+              >
+                取消转换
+              </button>
+            ) : !currentScreenplay && statusMap[activeIndex] !== "waiting" && statusMap[activeIndex] !== "queued" ? (
+              <button
+                onClick={() => {
+                  if (isConverting) {
+                    // 正在转换中，加入队列
+                    queueRef.current.push(activeIndex);
+                    setStatusMap((prev) => ({ ...prev, [activeIndex]: "queued" }));
+                    setActiveIndex(activeIndex);
+                  } else {
+                    handleConvert(activeIndex);
+                  }
+                }}
                 className="ml-auto px-4 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition"
               >
-                转换此章
+                {isConverting ? "加入队列" : "转换此章"}
               </button>
-            )}
+            ) : null}
           </div>
 
           {/* Error */}
@@ -235,9 +309,15 @@ export default function ConvertPage() {
                 <>
                   <div className="inline-block w-8 h-8 border-3 border-blue-200 border-t-blue-600 rounded-full animate-spin mb-3" />
                   <p className="text-lg mb-1 text-gray-600">正在转换当前章节…</p>
-                  <p className="text-sm text-gray-400">转换完成后将自动显示</p>
+                  <p className="text-sm text-gray-400 mb-3">转换完成后将自动显示</p>
+                  <button
+                    onClick={handleCancel}
+                    className="text-xs px-4 py-1.5 border border-red-300 text-red-500 rounded hover:bg-red-50 transition"
+                  >
+                    取消转换
+                  </button>
                 </>
-              ) : statusMap[activeIndex] === "waiting" ? (
+              ) : statusMap[activeIndex] === "waiting" || statusMap[activeIndex] === "queued" ? (
                 <>
                   <div className="inline-block w-8 h-8 border-3 border-gray-200 border-t-gray-400 rounded-full animate-spin mb-3" />
                   <p className="text-lg mb-1 text-gray-500">排队等待中…</p>

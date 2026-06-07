@@ -2,13 +2,15 @@
 
 import type { ChapterInfo } from "@/types/screenplay";
 
-type ChapterStatus = "pending" | "waiting" | "converting" | "done" | "error";
+type ChapterStatus = "pending" | "waiting" | "queued" | "converting" | "done" | "error";
 
 interface ChapterSelectorProps {
   chapters: ChapterInfo[];
   activeIndex: number;
   onSelect: (index: number) => void;
   onConvertAll?: () => void;
+  onCancel?: () => void;
+  isConverting?: boolean;
   statusMap?: Record<number, ChapterStatus>;
 }
 
@@ -17,11 +19,14 @@ export default function ChapterSelector({
   activeIndex,
   onSelect,
   onConvertAll,
+  onCancel,
+  isConverting,
   statusMap,
 }: ChapterSelectorProps) {
   const statusIcon: Record<ChapterStatus, string> = {
     pending: "○",
     waiting: "◷",
+    queued: "🕐",
     converting: "⏳",
     done: "✅",
     error: "❌",
@@ -30,6 +35,7 @@ export default function ChapterSelector({
   const statusColor: Record<ChapterStatus, string> = {
     pending: "text-gray-400",
     waiting: "text-gray-400",
+    queued: "text-yellow-500",
     converting: "text-blue-500 animate-pulse",
     done: "text-green-600",
     error: "text-red-500",
@@ -43,14 +49,21 @@ export default function ChapterSelector({
     <div className="border rounded-lg overflow-hidden">
       <div className="px-4 py-3 bg-gray-50 border-b flex items-center justify-between">
         <span className="text-sm font-medium">章节列表</span>
-        {onConvertAll && (
+        {isConverting && onCancel ? (
+          <button
+            onClick={onCancel}
+            className="text-xs px-3 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition"
+          >
+            取消全部
+          </button>
+        ) : onConvertAll ? (
           <button
             onClick={onConvertAll}
             className="text-xs px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition"
           >
             全部转换
           </button>
-        )}
+        ) : null}
       </div>
 
       {statusMap && (

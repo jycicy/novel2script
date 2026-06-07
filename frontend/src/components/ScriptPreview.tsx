@@ -4,6 +4,8 @@ import type { Screenplay, ContentBlock } from "@/types/screenplay";
 
 interface ScriptPreviewProps {
   screenplay: Screenplay;
+  /** 为 true 时不设内部滚动，由外层容器控制 */
+  noScroll?: boolean;
 }
 
 const ROLE_COLORS: Record<string, string> = {
@@ -22,7 +24,7 @@ const ROLE_LABELS: Record<string, string> = {
   narrator: "旁白",
 };
 
-export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
+export default function ScriptPreview({ screenplay, noScroll }: ScriptPreviewProps) {
   const getCharacterName = (id: string): string => {
     const char = screenplay.characters.find((c) => c.id === id);
     return char?.name || id;
@@ -118,7 +120,7 @@ export default function ScriptPreview({ screenplay }: ScriptPreviewProps) {
       )}
 
       {/* Scenes */}
-      <div className="p-6 font-mono overflow-y-auto" style={{ maxHeight: "500px" }}>
+      <div className={`p-6 font-mono${noScroll ? "" : " overflow-y-auto"}`} style={noScroll ? undefined : { maxHeight: "500px" }}>
         {screenplay.scenes.filter(Boolean).map((scene, sceneIdx) => (
           <div key={sceneIdx} className="mb-10">
             <div className="flex items-center gap-3 mb-2">

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
+import { useAutoScroll } from "@/hooks/useAutoScroll";
 import ChapterSelector from "@/components/ChapterSelector";
 import ScriptPreview from "@/components/ScriptPreview";
 import ScriptEditor from "@/components/ScriptEditor";
@@ -22,6 +23,7 @@ export default function ConvertPage() {
   const [error, setError] = useState("");
   const [statusMap, setStatusMap] = useState<Record<number, "pending" | "waiting" | "queued" | "converting" | "done" | "error">>({});
   const [streamingYaml, setStreamingYaml] = useState("");
+  const yamlScroll = useAutoScroll([streamingYaml]);
   const cancelAllRef = useRef(false);    // 取消全部
   const cancelCurrentRef = useRef(false); // 只取消当前章
   const abortRef = useRef<AbortController | null>(null);
@@ -253,7 +255,13 @@ export default function ConvertPage() {
           Novel2Scripts
         </Link>
         <div className="flex items-center gap-3">
-          {currentScreenplay && <ExportMenu screenplay={currentScreenplay} />}
+          {currentScreenplay && (
+            <ExportMenu
+              screenplay={currentScreenplay}
+              chapters={chapters}
+              screenplays={screenplays}
+            />
+          )}
         </div>
       </header>
 
@@ -376,10 +384,24 @@ export default function ConvertPage() {
                 </button>
               </div>
               {viewMode === "editor" ? (
-                <pre className="bg-gray-900 text-green-400 text-xs p-4 rounded-lg overflow-auto max-h-[600px] font-mono whitespace-pre-wrap break-words">
-                  {streamingYaml}
-                  <span className="inline-block w-2 h-4 bg-green-400 animate-pulse ml-0.5" />
-                </pre>
+                <div className="relative">
+                  <div
+                    ref={yamlScroll.containerRef}
+                    onScroll={yamlScroll.handleScroll}
+                    className="bg-gray-900 text-green-400 text-xs p-4 rounded-lg overflow-auto max-h-[600px] font-mono whitespace-pre-wrap break-words"
+                  >
+                    {streamingYaml}
+                    <span className="inline-block w-2 h-4 bg-green-400 animate-pulse ml-0.5" />
+                  </div>
+                  {!yamlScroll.isAtBottom && (
+                    <button
+                      onClick={yamlScroll.scrollToBottom}
+                      className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 px-3 py-1.5 text-xs bg-white border border-gray-300 rounded-full shadow-md hover:bg-gray-50 transition flex items-center gap-1"
+                    >
+                      <span>↓</span> 回到底部
+                    </button>
+                  )}
+                </div>
               ) : (
                 <StreamingPreview yaml={streamingYaml} />
               )}

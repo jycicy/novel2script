@@ -14,9 +14,14 @@ function getErrorMessage(status: number): string {
   return map[status] || `请求失败 (${status})`;
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function request<T>(path: string, options?: RequestInit & { signal?: AbortSignal }): Promise<T> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 120000); // 120s 超时
+
+  // 外部取消信号
+  if (options?.signal) {
+    options.signal.addEventListener("abort", () => controller.abort());
+  }
 
   let res: Response;
   try {
@@ -67,10 +72,11 @@ export interface ConvertRequest {
   previous_characters?: { id: string; name: string; role: string }[];
 }
 
-export async function convertChapter(req: ConvertRequest): Promise<Screenplay> {
+export async function convertChapter(req: ConvertRequest, signal?: AbortSignal): Promise<Screenplay> {
   const res = await request<{ screenplay: Screenplay }>("/api/convert", {
     method: "POST",
     body: JSON.stringify(req),
+    signal,
   });
   return res.screenplay;
 }

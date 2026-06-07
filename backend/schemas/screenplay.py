@@ -1,6 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from enum import Enum
-from typing import Optional
+from typing import Optional, Union
 from datetime import datetime
 
 
@@ -51,6 +51,15 @@ class Character(BaseModel):
     description: Optional[str] = None
     appearance: Optional[str] = None
     voice_notes: Optional[str] = None
+
+    @field_validator("aliases", mode="before")
+    @classmethod
+    def coerce_aliases(cls, v):
+        if isinstance(v, str):
+            return [a.strip() for a in v.split(",") if a.strip()]
+        if v is None:
+            return []
+        return v
 
 
 class ContentBlock(BaseModel):

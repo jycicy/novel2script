@@ -118,7 +118,7 @@ export async function convertChapterStream(
       const body = await res.json().catch(() => ({}));
       clearTimeout(timeout);
       throw new Error(
-        (body as { detail?: string }).detail ?? ERROR_MAP[res.status] ?? `请求失败 (${res.status})`,
+        (body as { detail?: string }).detail ?? getErrorMessage(res.status),
       );
     }
 

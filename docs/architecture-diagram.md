@@ -38,11 +38,11 @@ graph TB
     convert --> llm
     export --> validator
 
-    LS --- UI
-    UI --- NovelInput
-    UI --- ChapterSelector
-    UI --- ScriptEditor
-    UI --- ExportMenu
+    LS --> UI
+    UI --> NovelInput
+    UI --> ChapterSelector
+    UI --> ScriptEditor
+    UI --> ExportMenu
 
     UI -- "HTTP /api/*" --> chapters
     UI -- "HTTP /api/*" --> convert
@@ -95,8 +95,8 @@ sequenceDiagram
 graph LR
     text["小说文本"] --> detect["章节检测"]
     detect --> prompt["Prompt 构建"]
-    prompt --> call["LLM 调用"]
-    call --> fix["YAML 修复"]
+    prompt --> llmCall["LLM 调用"]
+    llmCall --> fix["YAML 修复"]
     fix --> validate["Schema 校验"]
     validate --> screenplay["Screenplay"]
     screenplay --> files["YAML/JSON 文件"]
@@ -104,7 +104,7 @@ graph LR
     style text fill:#e1f5fe,stroke:#0288d1
     style detect fill:#fff3e0,stroke:#f57c00
     style prompt fill:#fff3e0,stroke:#f57c00
-    style call fill:#fff3e0,stroke:#f57c00
+    style llmCall fill:#fff3e0,stroke:#f57c00
     style fix fill:#fff3e0,stroke:#f57c00
     style validate fill:#fff3e0,stroke:#f57c00
     style screenplay fill:#e8f5e9,stroke:#388e3c
